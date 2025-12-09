@@ -800,8 +800,19 @@
             padding: 0 !important;
             background: transparent !important;
             cursor: pointer;
-            transition: opacity 0.2s, filter 0.2s;
+            transition: opacity 0.2s, filter 0.2s, transform 0.1s, box-shadow 0.1s;
             position: relative;
+        }
+        
+        /* 添加点击反馈效果 */
+        .pay-card:not(.received):not(.rejected):active {
+            transform: scale(0.98);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 添加悬停效果 */
+        .pay-card:not(.received):not(.rejected):hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .pay-card.received,
@@ -14302,6 +14313,18 @@ Stay in character as "${c.name}" permanently.`;
                                 setTimeout(processQueue, 100);
                                 return;
                             }
+                            // 5. 识别转账
+                            else if (String(msgContent).match(/^\[转账:/)) {
+                                const transferMatch = String(msgContent).match(/^\[转账:\s*(.*?)\]$/);
+                                let amount = '0.00', note = '转账';
+                                if (transferMatch) {
+                                    const parts = transferMatch[1].trim().split(/\s+/);
+                                    if (!isNaN(parseFloat(parts[0]))) { amount = parts[0]; if (parts[1]) note = parts.slice(1).join(' '); }
+                                }
+                                WeChatUI.pushMessage('transfer', { note, amount }, 'ai', 'transfer', null, targetCid);
+                                setTimeout(processQueue, 100);
+                                return;
+                            }
                             // --- 【修复 1】识别 AI 语音消息 ---
                             // 兼容格式：[语音: 内容] 或 [语音：内容]
                             const voiceMatch = String(msgContent).match(/^\[语音[:：]\s*(.*?)\]$/);
@@ -14478,6 +14501,12 @@ Stay in character as "${c.name}" permanently.`;
                     const amount = parseFloat(content.amount || '0');
                     const typeText = msgType === 'redpacket' ? '红包' : '转账';
                     WeChatUI.updateWalletBalance('expense', amount, `向${chars[cid].name}发送${typeText}`);
+                    
+                    // AI 自动处理红包或转账
+                    // 添加延迟，让用户看到消息后再处理
+                    setTimeout(() => {
+                        WeChatUI.handleAIReceivedPayment(cid, msgObj);
+                    }, 1000);
                 }
 
                 // 保存数据 
