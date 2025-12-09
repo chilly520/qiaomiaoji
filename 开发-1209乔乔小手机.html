@@ -3143,10 +3143,19 @@
                         <h3 class="section-title">思维活跃度 (Temp)</h3>
                         <span id="primary-temp-display" class="text-blue-600">0.7</span>
                     </div>
-                    <div class="glass-panel p-4 rounded-2xl mb-6">
+                    <div class="glass-panel p-4 rounded-2xl mb-3">
                         <input type="range" id="primary-api-temp" min="0" max="2" step="0.1" value="0.7"
                             class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500"
                             oninput="document.getElementById('primary-temp-display').textContent=this.value">
+                    </div>
+                    <div class="flex justify-between items-center mt-4">
+                        <h3 class="section-title">最大输出 token</h3>
+                        <span id="primary-max-tokens-display" class="text-blue-600">4096</span>
+                    </div>
+                    <div class="glass-panel p-4 rounded-2xl mb-6">
+                        <input type="range" id="primary-api-max-tokens" min="256" max="50000" step="256" value="4096"
+                            class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                            oninput="document.getElementById('primary-max-tokens-display').textContent=this.value">
                     </div>
                 </div>
             </div>
@@ -3178,10 +3187,19 @@
                         <h3 class="section-title">思维活跃度 (Temp)</h3>
                         <span id="secondary-temp-display" class="text-purple-600">0.7</span>
                     </div>
-                    <div class="glass-panel p-4 rounded-2xl mb-6">
+                    <div class="glass-panel p-4 rounded-2xl mb-3">
                         <input type="range" id="secondary-api-temp" min="0" max="2" step="0.1" value="0.7"
                             class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-purple-500"
                             oninput="document.getElementById('secondary-temp-display').textContent=this.value">
+                    </div>
+                    <div class="flex justify-between items-center mt-4">
+                        <h3 class="section-title">最大输出 token</h3>
+                        <span id="secondary-max-tokens-display" class="text-purple-600">4096</span>
+                    </div>
+                    <div class="glass-panel p-4 rounded-2xl mb-6">
+                        <input type="range" id="secondary-api-max-tokens" min="256" max="50000" step="256" value="4096"
+                            class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            oninput="document.getElementById('secondary-max-tokens-display').textContent=this.value">
                     </div>
                 </div>
             </div>
@@ -5999,7 +6017,9 @@
                 document.getElementById(`${prefix}key`).value = config.key;
                 document.getElementById(`${prefix}model`).value = config.model;
                 document.getElementById(`${prefix}temp`).value = config.temp;
+                document.getElementById(`${prefix}max-tokens`).value = config.max_tokens || 4096;
                 document.getElementById(`${type}-temp-display`).textContent = config.temp;
+                document.getElementById(`${type}-max-tokens-display`).textContent = config.max_tokens || 4096;
             },
             saveAPI: () => {
                 // 保存主配置
@@ -6009,7 +6029,8 @@
                     url: document.getElementById('primary-api-url').value,
                     key: document.getElementById('primary-api-key').value,
                     model: document.getElementById('primary-api-model').value,
-                    temp: document.getElementById('primary-api-temp').value
+                    temp: document.getElementById('primary-api-temp').value,
+                    max_tokens: parseInt(document.getElementById('primary-api-max-tokens').value)
                 };
                 const primaryIdx = SettingsLogic.configs.findIndex(c => c.id === SettingsLogic.currentId);
                 if (primaryIdx !== -1) SettingsLogic.configs[primaryIdx] = primaryConfig;
@@ -6023,7 +6044,8 @@
                         url: document.getElementById('secondary-api-url').value,
                         key: document.getElementById('secondary-api-key').value,
                         model: document.getElementById('secondary-api-model').value,
-                        temp: document.getElementById('secondary-api-temp').value
+                        temp: document.getElementById('secondary-api-temp').value,
+                        max_tokens: parseInt(document.getElementById('secondary-api-max-tokens').value)
                     };
                     const secondaryIdx = SettingsLogic.configs.findIndex(c => c.id === secondaryId);
                     if (secondaryIdx !== -1) SettingsLogic.configs[secondaryIdx] = secondaryConfig;
@@ -7002,7 +7024,7 @@
                     model: config.model,
                     messages: apiMessages,
                     temperature: parseFloat(config.temp) || 0.9,
-                    max_tokens: 4096,
+                    max_tokens: parseInt(config.max_tokens) || 4096,
                     safetySettings: [
                         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
                         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
@@ -10639,6 +10661,11 @@
                     return;
                 }
 
+                // 如果已经在说话，等待当前朗读结束后再处理
+                if (WeChatUI.isSpeaking) {
+                    return;
+                }
+
                 WeChatUI.isSpeaking = true;
                 const { text, char } = WeChatUI.ttsQueue.shift();
 
@@ -10805,25 +10832,31 @@
                         // 开关检查
                         if (!char.activeChat) return;
 
-                        // 初始化 lastSeen (如果是旧数据没有这个字段，初始化为当前时间并保存)
-                        // 这里的 lastSeen 存在硬盘里，刷新页面也不会丢
-                        if (!char.lastSeen) {
-                            char.lastSeen = now;
-                            needSave = true;
-                        }
-
-                        // --- 核心逻辑 ---
-                        if (char.id === currentOpenCharId) {
-                            // 情况A：你正在看着这个角色
-                            // 只要你看着他，计时器就更新为当前时间
-                            // 为了减少写入频率，只有差异超过10秒才更新一次存储
-                            if (now - char.lastSeen > 10000) {
-                                char.lastSeen = now;
-                                needSave = true;
+                        // --- 核心逻辑修改：使用最后一条消息时间作为计时起点 ---
+                        let lastInteractionTime;
+                        
+                        // 获取最后一条消息的时间
+                        if (char.msgs && char.msgs.length > 0) {
+                            // 筛选出有效的聊天消息（排除系统消息）
+                            const validMsgs = char.msgs.filter(msg => msg.type !== 'system' && msg.type !== 'error');
+                            if (validMsgs.length > 0) {
+                                // 按时间戳排序，取最后一条
+                                const lastMsg = validMsgs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+                                lastInteractionTime = lastMsg.timestamp || now;
+                            } else {
+                                lastInteractionTime = now;
                             }
                         } else {
+                            lastInteractionTime = now;
+                        }
+
+                        // 如果当前正在聊天界面，更新最后交互时间
+                        if (char.id === currentOpenCharId) {
+                            // 情况A：你正在看着这个角色，重置计时
+                            lastInteractionTime = now;
+                        } else {
                             // 情况B：你没在看他 (你在桌面、后台、或者在跟别人聊天)
-                            const timeGap = now - char.lastSeen;
+                            const timeGap = now - lastInteractionTime;
                             const settingInterval = (parseInt(char.activeInterval) || 30) * 60 * 1000;
 
                             // 触发判断：
@@ -10832,18 +10865,9 @@
 
                                 // 触发消息
                                 WeChatUI.triggerActiveMessage(char, timeGap, true);
-
-                                // 触发后重置计时器，防止轰炸
-                                char.lastSeen = now;
-                                needSave = true;
                             }
                         }
                     });
-
-                    // 统一保存状态，防止数据丢失
-                    if (needSave) {
-                        Storage.set('wechat_chars', chars);
-                    }
                 }, 10000); // 10秒轮询一次
             },
 
@@ -13403,24 +13427,24 @@
                 WeChatUI.loadChat(cid);
             },
 
-            handleAIReceivedPayment: (cid, msg) => {
+            handleAIReceivedPayment: (cid, msg, action) => {
                 // AI 收到红包或转账时的自动处理逻辑
                 const chars = Storage.get('wechat_chars', {});
                 if (!chars[cid]) return;
 
-                // 随机决定接受或拒绝，80% 概率接受
-                const action = Math.random() > 0.2 ? 'received' : 'rejected';
-                const actionText = action === 'received' ? '收款' : '退还';
+                // 如果没有指定action，则随机决定接受或拒绝，80% 概率接受
+                const finalAction = action || (Math.random() > 0.2 ? 'received' : 'rejected');
+                const actionText = finalAction === 'received' ? '收款' : '退还';
                 const typeText = msg.type === 'transfer' ? '转账' : '红包';
 
                 // 更新消息状态
-                msg.status = action;
+                msg.status = finalAction;
 
                 // 添加系统消息
                 const sysMsg = {
                     role: 'system',
                     type: 'system',
-                    content: `你${actionText}了${chars[cid].name}的${typeText}`,
+                    content: `${chars[cid].name}${actionText}了你的${typeText}`,
                     timestamp: Date.now()
                 };
 
@@ -13774,6 +13798,49 @@
                     const boundNPCs = c.boundNPCs || [];
                     let npcInfo = boundNPCs.length > 0 ? 'Bound NPCs active.\n' : '';
 
+                    // --- 世界书、记忆与表情包注入 ---
+                    // 获取世界书信息
+                    const books = Storage.get('wechat_worldbooks', {});
+                    let worldInfo = "";
+                    if (c && c.worldbookEntries) {
+                        c.worldbookEntries.forEach(entryId => {
+                            const [bookId, entryIdx] = entryId.split('_');
+                            const book = books[bookId];
+                            if (book && book.entries && book.entries[parseInt(entryIdx)]) {
+                                const entry = book.entries[parseInt(entryIdx)];
+                                if (entry.enabled && entry.content) worldInfo += `[World Info: ${entry.content}]\n`;
+                            }
+                        });
+                    }
+                    
+                    // 获取记忆信息
+                    let memoryInfo = "";
+                    if (c && c.memory && c.memory.length > 0) {
+                        memoryInfo += "\n[System Note - Historical Memory (Fact)]:\n";
+                        c.memory.forEach(m => {
+                            if (m.type === 'summary') {
+                                const dateStr = new Date(m.timestamp).toLocaleString();
+                                memoryInfo += `- [${dateStr}] ${m.content}\n`;
+                            }
+                        });
+                        memoryInfo += "[End of History]\n";
+                    }
+                    
+                    // 获取表情包信息
+                    let emojiInfo = "";
+                    const globalEmojis = Storage.get('wechat_global_emojis', []);
+                    const charEmojis = c ? (c.emojis || []) : [];
+                    const allEmojis = [...globalEmojis, ...charEmojis];
+                    if (allEmojis.length > 0) {
+                        emojiInfo += "\n[System Note - Available Emojis (Fact)]:\n";
+                        allEmojis.forEach((emoji, index) => {
+                            const emojiName = emoji.name || `表情${index + 1}`;
+                            emojiInfo += `- ${emoji.url} (名称: ${emojiName}) - ${emoji.type === 'global' ? '全局表情包' : '专属表情包'}\n`;
+                        });
+                        emojiInfo += "[End of Available Emojis]\n";
+                        emojiInfo += "[重要提示]：你必须直接使用上述URL，禁止使用[表情包:名称]格式！\n";
+                    }
+
                     // --- 核心 Prompt (强制心声) ---
                     // 获取朋友圈动态信息
                     const moments = Storage.get('wechat_moments', []);
@@ -13803,12 +13870,24 @@
                     const currentPatSuffix = c.patSuffix || '的头';
 
                     // 使用简单的字符串连接避免模板字符串的语法问题
-                    let systemPrompt = "[Roleplay Protocol]\n";
+                    let systemPrompt = "==================================================\n";
+                    systemPrompt += "【第一部分：角色设定】\n";
+                    systemPrompt += "==================================================\n";
                     systemPrompt += "1. YOU ARE \"" + c.name + "\".\n";
-                    systemPrompt += "2. Tone: Casual, separate sentences naturally. When encountering brackets (), [], {}, or <>, you must separate the sentence before and after the brackets into different sentences.\n";
-                    systemPrompt += "3. Persona: " + (c.prompt || 'A friendly friend.') + ".\n";
-                    systemPrompt += "4. User: " + (c.userName || 'User') + ".\n";
+                    systemPrompt += "2. Persona: " + (c.prompt || 'A friendly friend.') + ".\n";
+                    systemPrompt += "3. User: " + (c.userName || 'User') + ".\n";
+                    systemPrompt += "4. Tone: Casual, separate sentences naturally. When encountering brackets (), [], {}, or <>, you must separate the sentence before and after the brackets into different sentences.\n";
                     systemPrompt += timeContext + latestVoice + "\n\n";
+                    
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "【第二部分：世界书】\n";
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += (worldInfo || "暂无关联世界书内容\n\n");
+                    systemPrompt += memoryInfo + "\n";
+                    
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "【第三部分：系统规则】\n";
+                    systemPrompt += "==================================================\n";
                     systemPrompt += "[拍一拍(Nudge)协议]\n";
                     systemPrompt += "1. **当前设定**：你此时的拍一拍风格是：动作=\"**" + currentPatAction + "**\"，后缀=\"**" + currentPatSuffix + "**\"。\n";
                     systemPrompt += "   - 当用户拍你时，系统会显示：用户" + currentPatAction + "你的" + currentPatSuffix + "。\n";
@@ -13816,8 +13895,13 @@
                     systemPrompt += "2. **修改权限**：你可以随时修改这个设定。\n";
                     systemPrompt += "   - 指令格式：在回复的最后单独一行输出 [SET_PAT:动作:后缀]\n";
                     systemPrompt += "   - 例如输出 [SET_PAT:亲了亲:的脸颊]，下次系统提示就会变成 \"用户亲了亲你的脸颊\"。\n";
-                    systemPrompt += "3. **主动使用**：如果你想拍用户，请直接输出 [System: 拍一拍]。\n";
-                    systemPrompt += momentsInfo + "[Available Features]\n\n";
+                    systemPrompt += "3. **主动使用**：如果你想拍用户，请直接输出 [System: 拍一拍]。\n\n";
+                    
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "【第四部分：可用功能】\n";
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += momentsInfo;
+                    systemPrompt += emojiInfo;
                     systemPrompt += "[通信协议 - 必须严格遵守]\n";
                     systemPrompt += "1. **多气泡发送**：如果你想连续发送多条消息，请使用 \"###\" 作为分隔符。\n";
                     systemPrompt += "   - 所有特殊功能（图片、语音、HTML、红包、转账、表情包、朋友圈、打电话、打视频等）**必须**单独作为一个气泡，与普通文本**必须**使用###分隔，禁止在同一行同一段！\n";
@@ -14313,6 +14397,82 @@ Stay in character as "${c.name}" permanently.`;
                                 setTimeout(processQueue, 100);
                                 return;
                             }
+                            // 5. 识别AI领取红包指令
+                            else if (String(msgContent).match(/^\[领取红包\]$/)) {
+                                // 查找最近的未领取红包消息
+                                const chars = Storage.get('wechat_chars', {});
+                                const char = chars[targetCid];
+                                if (char && char.msgs) {
+                                    // 查找最近的未领取红包消息
+                                    const latestRedPacket = char.msgs
+                                        .filter(msg => msg.type === 'redpacket' && msg.role === 'user' && !msg.status)
+                                        .pop();
+                                    
+                                    if (latestRedPacket) {
+                                        // 触发红包领取逻辑
+                                        WeChatUI.handleAIReceivedPayment(targetCid, latestRedPacket);
+                                    }
+                                }
+                                setTimeout(processQueue, 100);
+                                return;
+                            }
+                            // 6. 识别AI拒绝红包指令
+                            else if (String(msgContent).match(/^\[拒绝红包\]$/)) {
+                                // 查找最近的未领取红包消息
+                                const chars = Storage.get('wechat_chars', {});
+                                const char = chars[targetCid];
+                                if (char && char.msgs) {
+                                    // 查找最近的未领取红包消息
+                                    const latestRedPacket = char.msgs
+                                        .filter(msg => msg.type === 'redpacket' && msg.role === 'user' && !msg.status)
+                                        .pop();
+                                    
+                                    if (latestRedPacket) {
+                                        // 直接拒绝红包
+                                        WeChatUI.handleAIReceivedPayment(targetCid, latestRedPacket, 'rejected');
+                                    }
+                                }
+                                setTimeout(processQueue, 100);
+                                return;
+                            }
+                            // 7. 识别AI收款指令
+                            else if (String(msgContent).match(/^\[收款\]$/)) {
+                                // 查找最近的未收款转账消息
+                                const chars = Storage.get('wechat_chars', {});
+                                const char = chars[targetCid];
+                                if (char && char.msgs) {
+                                    // 查找最近的未收款转账消息
+                                    const latestTransfer = char.msgs
+                                        .filter(msg => msg.type === 'transfer' && msg.role === 'user' && !msg.status)
+                                        .pop();
+                                    
+                                    if (latestTransfer) {
+                                        // 直接收款
+                                        WeChatUI.handleAIReceivedPayment(targetCid, latestTransfer, 'received');
+                                    }
+                                }
+                                setTimeout(processQueue, 100);
+                                return;
+                            }
+                            // 8. 识别AI拒绝收款指令
+                            else if (String(msgContent).match(/^\[拒绝收款\]$/)) {
+                                // 查找最近的未收款转账消息
+                                const chars = Storage.get('wechat_chars', {});
+                                const char = chars[targetCid];
+                                if (char && char.msgs) {
+                                    // 查找最近的未收款转账消息
+                                    const latestTransfer = char.msgs
+                                        .filter(msg => msg.type === 'transfer' && msg.role === 'user' && !msg.status)
+                                        .pop();
+                                    
+                                    if (latestTransfer) {
+                                        // 直接拒绝收款
+                                        WeChatUI.handleAIReceivedPayment(targetCid, latestTransfer, 'rejected');
+                                    }
+                                }
+                                setTimeout(processQueue, 100);
+                                return;
+                            }
                             // 5. 识别转账
                             else if (String(msgContent).match(/^\[转账:/)) {
                                 const transferMatch = String(msgContent).match(/^\[转账:\s*(.*?)\]$/);
@@ -14501,12 +14661,6 @@ Stay in character as "${c.name}" permanently.`;
                     const amount = parseFloat(content.amount || '0');
                     const typeText = msgType === 'redpacket' ? '红包' : '转账';
                     WeChatUI.updateWalletBalance('expense', amount, `向${chars[cid].name}发送${typeText}`);
-                    
-                    // AI 自动处理红包或转账
-                    // 添加延迟，让用户看到消息后再处理
-                    setTimeout(() => {
-                        WeChatUI.handleAIReceivedPayment(cid, msgObj);
-                    }, 1000);
                 }
 
                 // 保存数据 
