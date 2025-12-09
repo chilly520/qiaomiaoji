@@ -7,6 +7,9 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>乔乔小手机 OS</title>
 
+    <meta http-equiv="Content-Security-Policy" content="connect-src * data: blob: 'unsafe-inline'; default-src * data: blob: 'unsafe-inline' 'unsafe-eval';">
+    <meta name="referrer" content="no-referrer">
+
     <!-- PWA Settings -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -5391,7 +5394,10 @@
                     }
 
                     // 使用Google Translate API进行翻译
-                    const response = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=' + encodeURIComponent(chineseText));
+                    const response = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=en&dt=t&q=' + encodeURIComponent(chineseText), {
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
                     const data = await response.json();
                     return data[0][0][0];
                 } catch (error) {
@@ -7004,7 +7010,9 @@
                     const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(payload),
+                        mode: 'cors',
+                        credentials: 'omit'
                     });
                     if (!res.ok) {
                         let errorMsg = 'HTTP ' + res.status;
@@ -7113,6 +7121,8 @@
                                 'Content-Type': 'application/json',
                                 'GroupId': groupId
                             },
+                            mode: 'cors',
+                            credentials: 'omit',
                             body: JSON.stringify({
                                 "model": globalTTS.minimax.modelId || 'speech-01-turbo',
                                 "text": text,
