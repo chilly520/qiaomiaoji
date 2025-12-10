@@ -687,6 +687,97 @@
             min-width: 150px !important;
         }
 
+        /* --- 语音条样式重构 (仿黑金胶囊风格) --- */
+        .voice-container {
+            display: flex;
+            flex-direction: column;
+            width: auto;
+        }
+
+        .voice-bubble {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 16px;
+            height: 40px;
+            /* 固定高度增加质感 */
+            border-radius: 20px;
+            /* 胶囊形状 */
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+            min-width: 70px;
+            max-width: 220px;
+        }
+
+        /* 对方语音条：黑金渐变 + 金色微边框 */
+        .msg-row.other .voice-bubble {
+            background: linear-gradient(135deg, #2b2623 0%, #1a1a1c 100%);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: #e6dcc0;
+        }
+
+        /* 自己语音条：深灰渐变 */
+        .msg-row.self .voice-bubble {
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            flex-direction: row-reverse;
+            /* 图标靠右 */
+        }
+
+        .voice-icon {
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+        }
+
+        .voice-playing .voice-icon i {
+            animation: wifi-pulse 1s infinite;
+            /* 播放波纹 */
+        }
+
+        .voice-duration {
+            font-size: 14px;
+            font-weight: 500;
+            font-family: Arial, sans-serif;
+        }
+
+        /* 文字区域：深色半透明背景 */
+        .voice-text {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.85);
+            margin-top: 6px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background-color: rgba(0, 0, 0, 0.3);
+            /* 关键：比周围更暗 */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            width: 100%;
+            display: none;
+            line-height: 1.5;
+        }
+
+        .voice-text.expanded {
+            display: block;
+        }
+
+        @keyframes wifi-pulse {
+            0% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.3;
+            }
+        }
+
         /* Chat Bubble System (Custom Dark Gold Style) */
         .chat-bubble {
             padding: 10px 14px;
@@ -1407,12 +1498,15 @@
             z-index: 1;
             overflow: hidden;
             background: #333;
+            flex-shrink: 0;
+            aspect-ratio: 1 / 1;
         }
 
         .rp-user-avatar img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            border-radius: 50%;
         }
 
         .rp-msg {
@@ -4018,14 +4112,26 @@
 
                 <!-- Active Chat -->
                 <div class="flex items-center justify-between glass-panel p-3 rounded-lg mb-2">
-                    <span class="text-sm text-gray-800 font-bold">主动发消息 (查岗)</span>
+                    <span class="text-sm text-gray-800 font-bold">查岗（离开界面后触发）</span>
                     <input type="checkbox" id="char-active-chat-switch" class="toggle-switch">
                 </div>
                 <div class="flex items-center gap-2 mb-4 px-2">
-                    <span class="text-xs text-gray-600">超过</span>
+                    <span class="text-xs text-gray-600">离开</span>
                     <input type="number" id="char-active-interval" class="setting-input w-16 text-center mb-0 py-1"
                         value="30">
-                    <span class="text-xs text-gray-600">分钟不理我时触发</span>
+                    <span class="text-xs text-gray-600">分钟后触发</span>
+                </div>
+
+                <!-- Proactive Chat (新功能) -->
+                <div class="flex items-center justify-between glass-panel p-3 rounded-lg mb-2">
+                    <span class="text-sm text-gray-800 font-bold">主动发消息（界面内触发）</span>
+                    <input type="checkbox" id="char-proactive-chat-switch" class="toggle-switch">
+                </div>
+                <div class="flex items-center gap-2 mb-4 px-2">
+                    <span class="text-xs text-gray-600">每隔</span>
+                    <input type="number" id="char-proactive-interval" class="setting-input w-16 text-center mb-0 py-1"
+                        value="5">
+                    <span class="text-xs text-gray-600">分钟主动发一条消息</span>
                 </div>
 
                 <!-- Memory -->
@@ -6455,6 +6561,54 @@
                                     </div>
                                 </div>
                                 
+                                <!-- 全局表情包 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-emojis" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-emojis" class="text-white font-semibold">全局表情包</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 钱包数据 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-wallet" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-wallet" class="text-white font-semibold">钱包与交易记录</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 朋友圈 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-moments" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-moments" class="text-white font-semibold">朋友圈</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- NPC数据 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-npcs" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-npcs" class="text-white font-semibold">NPC数据</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 用户资料 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-user-profile" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-user-profile" class="text-white font-semibold">用户资料</label>
+                                    </div>
+                                </div>
+                                
+                                <!-- 查岗手机数据 -->
+                                <div class="glass-panel p-3 rounded-xl">
+                                    <div class="flex items-center gap-3">
+                                        <input type="checkbox" id="export-search-phone" class="w-5 h-5 rounded-full accent-blue-400" checked>
+                                        <label for="export-search-phone" class="text-white font-semibold">查岗手机数据</label>
+                                    </div>
+                                </div>
+                                
                                 <!-- 其他应用数据 -->
                                 <div class="glass-panel p-3 rounded-xl">
                                     <div class="flex items-center gap-3">
@@ -6501,10 +6655,41 @@
                     });
                 }
 
+                // 导出全局表情包
+                if (document.getElementById('export-emojis')?.checked) {
+                    exportData.wechat_global_emojis = AppStorage.get('wechat_global_emojis', []);
+                }
+
+                // 导出钱包数据
+                if (document.getElementById('export-wallet')?.checked) {
+                    exportData.wechat_wallet = AppStorage.get('wechat_wallet', { balance: 0, transactions: [] });
+                }
+
+                // 导出朋友圈
+                if (document.getElementById('export-moments')?.checked) {
+                    exportData.wechat_moments = AppStorage.get('wechat_moments', []);
+                }
+
+                // 导出NPC数据
+                if (document.getElementById('export-npcs')?.checked) {
+                    exportData.wechat_npcs = AppStorage.get('wechat_npcs', {});
+                }
+
+                // 导出用户资料
+                if (document.getElementById('export-user-profile')?.checked) {
+                    exportData.wechat_user_profile = AppStorage.get('wechat_user_profile', {});
+                }
+
+                // 导出查岗手机数据
+                if (document.getElementById('export-search-phone')?.checked) {
+                    exportData.wechat_search_phone_data = AppStorage.get('wechat_search_phone_data', {});
+                }
+
                 // 导出系统设置
                 if (document.getElementById('export-settings').checked) {
-                    exportData.api_configs = AppStorage.get('api_configs');
-                    exportData.current_api_id = AppStorage.get('current_api_id');
+                    exportData.wechat_api_configs = AppStorage.get('wechat_api_configs');
+                    exportData.wechat_current_api = AppStorage.get('wechat_current_api');
+                    exportData.wechat_secondary_api = AppStorage.get('wechat_secondary_api');
                     exportData.tts_config = AppStorage.get('tts_config');
                     exportData.theme_config = AppStorage.get('theme_config');
                     exportData.weather_config = AppStorage.get('weather_config');
@@ -6889,147 +7074,185 @@
                 }
             },
 
-    generateLLM: async (messages, cid, useSecondary = false) => {
-        // 【1. 读取配置】直接从本地存储读取，不再依赖内存变量，解决配置“失效”问题
-        const currentId = AppStorage.get('wechat_current_api', 'default');
-        const allConfigs = AppStorage.get('wechat_api_configs', {});
-        
-        // 尝试获取配置
-        let config = allConfigs[currentId];
-        
-        // 处理副API逻辑
-        if (useSecondary) {
-            const secConfig = AppStorage.get('wechat_secondary_api', null);
-            if (secConfig && secConfig.url) {
-                config = secConfig;
-                console.log('[SettingsLogic] 使用副API生成内容');
-            }
-        }
+            // 【⚠️高危核心区域】修改前请务必仔细阅读！
+            // 此函数负责构建所有 API 请求的上下文（Persona, WorldBook, Memory, Functions）。
+            // 【禁止随意修改 Prompt 拼接顺序】：顺序已被用户锁定为 [Functions -> Persona -> World -> Other]。
+            // 【禁止随意修改 Emoji/Moments 提示词】：指令格式需严格匹配 handleAIReply 中的正则。
+            generateLLM: async (messages, cid, useSecondary = false) => {
+                // 【1. 读取配置】直接从本地存储读取，不再依赖内存变量，解决配置“失效”问题
+                const currentId = AppStorage.get('wechat_current_api', 'default');
+                const allConfigs = AppStorage.get('wechat_api_configs', {});
 
-        // 容错：如果找不到配置，尝试读取 default
-        if (!config || !config.url) {
-            console.warn('[SettingsLogic] 指定配置无效，尝试回退到默认配置');
-            config = allConfigs['default'];
-        }
+                // 尝试获取配置
+                let config = allConfigs[currentId];
 
-        // 最终检查
-        if (!config || !config.url || !config.key) {
-            window.Utils.showToast('API配置无效，请前往设置检查API连接');
-            throw new Error("API配置无效");
-        }
-
-        const chars = AppStorage.get('wechat_chars', {});
-        const char = chars[cid];
-
-        // 【2. 上下文注入】(世界书、记忆、表情包)
-        const books = AppStorage.get('wechat_worldbooks', {});
-        let worldInfo = "";
-        if (char && char.worldbookEntries) {
-            char.worldbookEntries.forEach(entryId => {
-                const [bookId, entryIdx] = entryId.split('_');
-                const book = books[bookId];
-                if (book && book.entries && book.entries[parseInt(entryIdx)]) {
-                    const entry = book.entries[parseInt(entryIdx)];
-                    if (entry.enabled && entry.content) worldInfo += `[World Info: ${entry.content}]\n`;
+                // 处理副API逻辑
+                if (useSecondary) {
+                    const secConfig = AppStorage.get('wechat_secondary_api', null);
+                    if (secConfig && secConfig.url) {
+                        config = secConfig;
+                        console.log('[SettingsLogic] 使用副API生成内容');
+                    }
                 }
-            });
-        }
 
-        let memoryInfo = "";
-        if (char && char.memory && char.memory.length > 0) {
-            memoryInfo += "\n[System Note - Historical Memory (Fact)]:\n";
-            char.memory.forEach(m => {
-                if (m.type === 'summary') {
-                    const dateStr = new Date(m.timestamp).toLocaleString();
-                    memoryInfo += `- [${dateStr}] ${m.content}\n`;
+                // 容错：如果找不到配置，尝试读取 default
+                if (!config || !config.url) {
+                    console.warn('[SettingsLogic] 指定配置无效，尝试回退到默认配置');
+                    config = allConfigs['default'];
                 }
-            });
-            memoryInfo += "[End of History]\n";
-        }
 
-        let emojiInfo = "";
-        const globalEmojis = AppStorage.get('wechat_global_emojis', []);
-        const charEmojis = char ? (char.emojis || []) : [];
-        const allEmojis = [...globalEmojis, ...charEmojis];
-        if (allEmojis.length > 0) {
-            emojiInfo += "\n[System Note - Available Emojis (Fact)]:\n";
-            allEmojis.forEach((emoji, index) => {
-                const emojiName = emoji.name || `表情${index + 1}`;
-                emojiInfo += `- ${emoji.url} (名称: ${emojiName}) - ${emoji.type === 'global' ? '全局表情包' : '专属表情包'}\n`;
-            });
-            emojiInfo += "[End of Available Emojis]\n";
-            emojiInfo += "[重要提示]：你必须直接使用上述URL，禁止使用[表情包:名称]格式！\n";
-        }
-
-        let momentsInfo = "";
-        momentsInfo += "\n[朋友圈指南]\n";
-        momentsInfo += "1. 感知：你可以通过系统提示读取朋友圈(Moments)。\n";
-        momentsInfo += "2. ID：每条动态有唯一ID，互动时必须引用。\n";
-        momentsInfo += "3. 互动指令：\n";
-        momentsInfo += "   - 点赞：[CMD:LIKE:ID]\n";
-        momentsInfo += "   - 评论：[CMD:COMMENT:ID:内容]\n";
-        momentsInfo += "   - 发帖：[CMD:MOMENT_POST:内容:配图提示词]\n";
-        momentsInfo += "   - 改签名：[SET_BIO:新签名]\n";
-
-        const allMoments = AppStorage.get('wechat_moments', []);
-        const recent = allMoments.slice(0, 5);
-        let envInfo = "";
-        if (recent.length > 0) {
-            envInfo = "\n[环境感知 - 朋友圈动态]:\n" + recent.map((m, i) => {
-                const author = (m.authorType === 'user') ? '我(User)' : '好友';
-                return `${i + 1}. [ID:${m.id}] ${author}: "${m.content.substring(0, 30)}..."`;
-            }).join('\n');
-            momentsInfo += envInfo;
-        }
-
-        // 【3. 准备API地址】
-        let endpoint = config.url.replace(/\/$/, '');
-        if (!endpoint.endsWith('/chat/completions')) {
-            if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
-            else endpoint += '/v1/chat/completions';
-        }
-
-        // 获取链接记忆上下文
-        const linkedMemoryContext = await WeChatUI.getLinkedMemoryContext(cid);
-
-        // 处理 System Prompt
-        if (messages && messages.length > 0 && messages[0].role === 'system') {
-            messages[0].content = worldInfo + memoryInfo + emojiInfo + momentsInfo + linkedMemoryContext + messages[0].content;
-        }
-
-        // 【4. 构建历史记录】
-        const historyLimit = char ? (char.contextLimit || 20) : 20;
-        const historyMsgs = char && char.msgs ? char.msgs.slice(-historyLimit) : [];
-
-        // 找出包含真实数据的图片索引（只保留最后一张图以节省Token）
-        const imageIndices = historyMsgs.map((m, i) => (m.type === 'image' && m.originalContent) ? i : -1).filter(i => i !== -1);
-        const activeImageIndices = imageIndices.slice(-1);
-
-        const apiMessages = messages && messages.length > 0 ? [messages[0]] : [];
-
-        historyMsgs.forEach((m, index) => {
-            let contentPayload;
-
-            if (m.type === 'image') {
-                if (m.originalContent && activeImageIndices.includes(index)) {
-                    contentPayload = [
-                        { type: "text", text: m.content.includes(':') ? m.content : "这是用户发送的图片" },
-                        { type: "image_url", image_url: { url: m.originalContent, detail: "low" } }
-                    ];
-                } else {
-                    const imageUrl = m.originalContent || (m.content.includes(':') ? m.content.split(':')[1].trim() : m.content);
-                    contentPayload = `[图片: ${imageUrl}]`;
+                // 最终检查
+                if (!config || !config.url || !config.key) {
+                    window.Utils.showToast('API配置无效，请前往设置检查API连接');
+                    throw new Error("API配置无效");
                 }
-            } else if (m.type === 'moment_share') {
-                let shareData = m.content;
-                if (typeof shareData === 'string') {
-                    try { shareData = JSON.parse(shareData); } catch (e) { shareData = { text: shareData }; }
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+
+                // 【2. 上下文注入】(世界书、记忆、表情包)
+                const books = AppStorage.get('wechat_worldbooks', {});
+                let worldInfo = "";
+                if (char && char.worldbookEntries) {
+                    char.worldbookEntries.forEach(entryId => {
+                        const [bookId, entryIdx] = entryId.split('_');
+                        const book = books[bookId];
+                        if (book && book.entries && book.entries[parseInt(entryIdx)]) {
+                            const entry = book.entries[parseInt(entryIdx)];
+                            if (entry.enabled && entry.content) worldInfo += `[World Info: ${entry.content}]\n`;
+                        }
+                    });
                 }
-                contentPayload = '[系统提示: 用户分享了一条朋友圈链接。作者：' + (shareData.author || '好友') + ', 内容："' + shareData.text + '"。请对此进行互动评论。]';
-            } else if (m.type === 'moment_card') {
-                let card = {};
-                try { card = JSON.parse(m.content); } catch (e) {}
-                contentPayload = `[系统提示：用户转发了一条朋友圈。
+
+                let memoryInfo = "";
+                if (char && char.memory && char.memory.length > 0) {
+                    memoryInfo += "\n[System Note - Historical Memory (Fact)]:\n";
+                    char.memory.forEach(m => {
+                        if (m.type === 'summary') {
+                            const dateStr = new Date(m.timestamp).toLocaleString();
+                            memoryInfo += `- [${dateStr}] ${m.content}\n`;
+                        }
+                    });
+                    memoryInfo += "[End of History]\n";
+                }
+
+                let emojiInfo = "";
+                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+                const charEmojis = char ? (char.emojis || []) : [];
+                const allEmojis = [...globalEmojis, ...charEmojis];
+                if (allEmojis.length > 0) {
+                    emojiInfo += "\n[System Note - Available Emojis (Fact)]:\n";
+                    allEmojis.forEach((emoji, index) => {
+                        const emojiName = emoji.name || `表情${index + 1}`;
+                        emojiInfo += `- ${emoji.url} (名称: ${emojiName}) - ${emoji.type === 'global' ? '全局表情包' : '专属表情包'}\n`;
+                    });
+                    emojiInfo += "[End of Available Emojis]\n";
+                    emojiInfo += "[重要提示]：请优先使用 [表情包:名称] 格式发送表情，系统会自动将其转换为图片。图片请使用 [图片: URL] 格式。\n";
+                    emojiInfo += "**【严格禁止】编造表情包名称！只能使用上述列表中已存在的表情包名称。如果列表中没有合适的表情包，请改用文字描述情绪。**\n";
+                }
+
+                // 【新增】心声格式指令
+                let innerVoiceInfo = "";
+                innerVoiceInfo += "[INNER_VOICE]\n";
+                innerVoiceInfo += "{\"着装\":\"详细描述你当前的全身穿着和着装状态，并在没有明确更换的剧情前保持服装不变。\",\"环境\":\"描述当前状态下的地点位置，当前所在时间+周几+地点+天气温度，如：2025年11月6日 周四［司荔庄园>卧室］晴 14°C，你的行为动作、表情、姿势、体态。\",\"心声\":\"内心真实想法，描述当前真实的内心想法，无论是友好的还是邪恶的，色色的。\",\"行为\":\"开头先写明当前对话是在【线上】/【线下】，以确保交互符合线上线下逻辑，*线上*是\"看\"消息，听不见摸不着；*线下*则是\"听\"说话，\"看\"行为。非nsfw状态下描述当前正在进行的话题和所处的事件；nsfw状态下则描述当前做爱流程进行到哪一步，即将进行哪一步，什么姿势，什么环境。\"}\n";
+                innerVoiceInfo += "[/INNER_VOICE]\n\n";
+                innerVoiceInfo += "**重要提示：** 请确保INNER_VOICE标签内的JSON包含所有四个字段：着装、环境、心声、行为，每个字段都要填写详细内容，不要留空。\n\n";
+                innerVoiceInfo += "例如：\n";
+                innerVoiceInfo += "[INNER_VOICE]\n";
+                innerVoiceInfo += "{\"着装\":\"穿着粉色睡衣\",\"环境\":\"在卧室的床上\",\"心声\":\"我好困，想睡觉\",\"行为\":\"轻轻拍着你的后背\"}\n";
+                innerVoiceInfo += "[/INNER_VOICE]\n";
+
+                // 【新增】转账和红包交互指令
+                let paymentInfo = "";
+                paymentInfo += "\n[转账/红包交互指南]\n";
+                paymentInfo += "**当用户向你发送转账或红包时，系统会自动提示你。你需要决定是否接受。**\n";
+                paymentInfo += "**格式：**\n";
+                paymentInfo += "- 接受转账：在回复的最后另起一行输出 [领取转账]\n";
+                paymentInfo += "- 拒绝转账：在回复的最后另起一行输出 [拒收转账]\n";
+                paymentInfo += "- 接受红包：在回复的最后另起一行输出 [领取红包]\n";
+                paymentInfo += "- 拒绝红包：在回复的最后另起一行输出 [拒收红包]\n";
+                paymentInfo += "**重要：** 这些指令会被系统自动处理，不会显示给用户。你可以在指令之前正常回复文字。\n";
+                paymentInfo += "**示例：**\n";
+                paymentInfo += "用户发来红包时，你可以回复：\n";
+                paymentInfo += "\"哇，谢谢！###[领取红包]\"\n";
+                paymentInfo += "或者拒绝：\n";
+                paymentInfo += "\"不用啦，你留着吧。###[拒收红包]\"\n\n";
+
+                let momentsInfo = "";
+                momentsInfo += "\n[朋友圈指南]\n";
+                momentsInfo += "1. 感知：你可以通过系统提示读取朋友圈(Moments)。\n";
+                momentsInfo += "2. ID：每条动态有唯一ID，互动时必须引用。\n";
+                momentsInfo += "3. 互动指令：\n";
+                momentsInfo += "   - 点赞：[CMD:LIKE:ID]\n";
+                momentsInfo += "   - 评论：[CMD:COMMENT:ID:内容]\n";
+                momentsInfo += "   - 发帖：[CMD:MOMENT_POST:内容:配图提示词]\n";
+                momentsInfo += "   - 改签名：[CMD:SET_BIO:新签名]\n";
+
+                const allMoments = AppStorage.get('wechat_moments', []);
+                const recent = allMoments.slice(0, 5);
+                let envInfo = "";
+                if (recent.length > 0) {
+                    envInfo = "\n[环境感知 - 朋友圈动态]:\n" + recent.map((m, i) => {
+                        const author = (m.authorType === 'user') ? '我(User)' : '好友';
+                        return `${i + 1}. [ID:${m.id}] ${author}: "${m.content.substring(0, 30)}..."`;
+                    }).join('\n');
+                    momentsInfo += envInfo;
+                }
+
+                // 【3. 准备API地址】
+                let endpoint = config.url.replace(/\/$/, '');
+                if (!endpoint.endsWith('/chat/completions')) {
+                    if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
+                    else endpoint += '/v1/chat/completions';
+                }
+
+                // 获取链接记忆上下文
+                const linkedMemoryContext = await WeChatUI.getLinkedMemoryContext(cid);
+
+                // 处理 System Prompt
+                // 【调整顺序】符合用户要求：系统提示词(系统和所有功能) -> 人物设定 -> 世界书 -> 其他提示词
+                if (messages && messages.length > 0 && messages[0].role === 'system') {
+                    const persona = messages[0].content;
+                    const systemFunctions = innerVoiceInfo + emojiInfo + paymentInfo + momentsInfo;
+                    const worldBook = worldInfo;
+                    const otherContext = memoryInfo + linkedMemoryContext;
+
+                    messages[0].content = systemFunctions + "\n\n" + persona + "\n\n" + worldBook + "\n\n" + otherContext;
+                }
+
+                // 【4. 构建历史记录】
+                const historyLimit = char ? (char.contextLimit || 20) : 20;
+                const historyMsgs = char && char.msgs ? char.msgs.slice(-historyLimit) : [];
+
+                // 找出包含真实数据的图片索引（只保留最后一张图以节省Token）
+                const imageIndices = historyMsgs.map((m, i) => (m.type === 'image' && m.originalContent) ? i : -1).filter(i => i !== -1);
+                const activeImageIndices = imageIndices.slice(-1);
+
+                const apiMessages = messages && messages.length > 0 ? [messages[0]] : [];
+
+                historyMsgs.forEach((m, index) => {
+                    let contentPayload;
+
+                    if (m.type === 'image') {
+                        if (m.originalContent && activeImageIndices.includes(index)) {
+                            contentPayload = [
+                                { type: "text", text: m.content.includes(':') ? m.content : "这是用户发送的图片" },
+                                { type: "image_url", image_url: { url: m.originalContent, detail: "low" } }
+                            ];
+                        } else {
+                            const imageUrl = m.originalContent || (m.content.includes(':') ? m.content.split(':')[1].trim() : m.content);
+                            contentPayload = `[图片: ${imageUrl}]`;
+                        }
+                    } else if (m.type === 'moment_share') {
+                        let shareData = m.content;
+                        if (typeof shareData === 'string') {
+                            try { shareData = JSON.parse(shareData); } catch (e) { shareData = { text: shareData }; }
+                        }
+                        contentPayload = '[系统提示: 用户分享了一条朋友圈链接。作者：' + (shareData.author || '好友') + ', 内容："' + shareData.text + '"。请对此进行互动评论。]';
+                    } else if (m.type === 'moment_card') {
+                        let card = {};
+                        try { card = JSON.parse(m.content); } catch (e) { }
+                        contentPayload = `[系统提示：用户转发了一条朋友圈。
 - 作者：${card.author || '未知'}
 - 内容："${card.text || ''}"
 - 朋友圈ID：${card.id}
@@ -7037,98 +7260,98 @@
 - 点赞：[CMD:LIKE:${card.id}]
 - 评论：[CMD:COMMENT:${card.id}:你的评论内容]
 ]`;
-            } else {
-                let textContent = m.content;
-                if (m.type === 'transfer') textContent = `[转账: ${m.amount}元]`;
-                if (m.type === 'redpacket') textContent = `[红包: ${m.note}]`;
-                if (m.type === 'voice') textContent = `[语音: "${m.text}"]`;
-                contentPayload = textContent;
-            }
+                    } else {
+                        let textContent = m.content;
+                        if (m.type === 'transfer') textContent = `[转账: ${m.amount}元]`;
+                        if (m.type === 'redpacket') textContent = `[红包: ${m.note}]`;
+                        if (m.type === 'voice') textContent = `[语音: "${m.text}"]`;
+                        contentPayload = textContent;
+                    }
 
-            if (contentPayload) {
-                apiMessages.push({
-                    role: m.role === 'user' ? 'user' : 'assistant',
-                    content: contentPayload
-                });
-            }
-        });
-
-        // 检查未领取的红包/转账
-        const userMsgs = historyMsgs.filter(msg => msg.role === 'user');
-        const hasPaymentMsg = userMsgs.some(msg => msg.type === 'transfer' || msg.type === 'redpacket');
-
-        if (hasPaymentMsg) {
-            const pendingPayments = userMsgs.filter(msg => (msg.type === 'transfer' || msg.type === 'redpacket') && (!msg.status || msg.status === 'pending'));
-            if (pendingPayments.length > 0) {
-                const latestPayment = pendingPayments.reduce((latest, current) => {
-                    return (latest.timestamp || 0) > (current.timestamp || 0) ? latest : current;
+                    if (contentPayload) {
+                        apiMessages.push({
+                            role: m.role === 'user' ? 'user' : 'assistant',
+                            content: contentPayload
+                        });
+                    }
                 });
 
-                if (latestPayment) {
-                    const amount = latestPayment.amount || '0.00';
-                    const note = latestPayment.note || '';
-                    const paymentType = latestPayment.type === 'transfer' ? '转账' : '红包';
+                // 检查未领取的红包/转账
+                const userMsgs = historyMsgs.filter(msg => msg.role === 'user');
+                const hasPaymentMsg = userMsgs.some(msg => msg.type === 'transfer' || msg.type === 'redpacket');
 
-                    apiMessages.push({
-                        role: 'system',
-                        content: `{{user}}给你发了${paymentType}，金额：${amount}元${note ? '，备注：' + note : ''}，请立即选择领取或拒绝。`
-                    });
+                if (hasPaymentMsg) {
+                    const pendingPayments = userMsgs.filter(msg => (msg.type === 'transfer' || msg.type === 'redpacket') && (!msg.status || msg.status === 'pending'));
+                    if (pendingPayments.length > 0) {
+                        const latestPayment = pendingPayments.reduce((latest, current) => {
+                            return (latest.timestamp || 0) > (current.timestamp || 0) ? latest : current;
+                        });
+
+                        if (latestPayment) {
+                            const amount = latestPayment.amount || '0.00';
+                            const note = latestPayment.note || '';
+                            const paymentType = latestPayment.type === 'transfer' ? '转账' : '红包';
+
+                            apiMessages.push({
+                                role: 'system',
+                                content: `{{user}}给你发了${paymentType}，金额：${amount}元${note ? '，备注：' + note : ''}，请立即选择领取或拒绝。`
+                            });
+                        }
+                    }
                 }
-            }
-        }
 
-        // 【5. 发送请求】
-        const payload = {
-            model: config.model,
-            messages: apiMessages,
-            temperature: parseFloat(config.temp) || 0.9,
-            // 修复键名不一致问题：config中保存的是 maxTokens，API参数需要 max_tokens
-            max_tokens: parseInt(config.maxTokens || config.max_tokens) || 4096,
-            safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-            ]
-        };
+                // 【5. 发送请求】
+                const payload = {
+                    model: config.model,
+                    messages: apiMessages,
+                    temperature: parseFloat(config.temp) || 0.9,
+                    // 修复键名不一致问题：config中保存的是 maxTokens，API参数需要 max_tokens
+                    max_tokens: parseInt(config.maxTokens || config.max_tokens) || 4096,
+                    safetySettings: [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                    ]
+                };
 
-        // 决定使用哪个队列
-        const targetQueue = (useSecondary && window.GenQueue) ? window.GenQueue : window.APIQueue;
+                // 决定使用哪个队列
+                const targetQueue = (useSecondary && window.GenQueue) ? window.GenQueue : window.APIQueue;
 
-        if (window.SystemLog) {
-            SystemLog.write('AI', 'API请求入队', { model: config.model, queueLength: targetQueue.queue.length });
-        }
+                if (window.SystemLog) {
+                    SystemLog.write('AI', 'API请求入队', { model: config.model, queueLength: targetQueue.queue.length });
+                }
 
-        return targetQueue.enqueue(async () => {
-            if (window.SystemLog) SystemLog.write('AI', '发起网络请求', payload);
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-                mode: 'cors',
-                credentials: 'omit'
-            });
-            if (!res.ok) {
-                let errorMsg = 'HTTP ' + res.status;
-                try {
-                    const errorData = await res.json();
-                    if (errorData.error) errorMsg += ': ' + errorData.error.message;
-                } catch (e) { errorMsg += ': ' + await res.text(); }
+                return targetQueue.enqueue(async () => {
+                    if (window.SystemLog) SystemLog.write('AI', '发起网络请求', payload);
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        mode: 'cors',
+                        credentials: 'omit'
+                    });
+                    if (!res.ok) {
+                        let errorMsg = 'HTTP ' + res.status;
+                        try {
+                            const errorData = await res.json();
+                            if (errorData.error) errorMsg += ': ' + errorData.error.message;
+                        } catch (e) { errorMsg += ': ' + await res.text(); }
 
-                if (window.SystemLog) SystemLog.write('ERR', 'API 请求失败', errorMsg);
-                throw new Error(errorMsg);
-            }
+                        if (window.SystemLog) SystemLog.write('ERR', 'API 请求失败', errorMsg);
+                        throw new Error(errorMsg);
+                    }
 
-            const data = await res.json();
-            if (window.SystemLog) SystemLog.write('AI', '收到回复', data);
-            
-            if (!data.choices || data.choices.length === 0) {
-                throw new Error(`API返回内容为空`);
-            }
-            return data.choices[0].message.content;
-        });
-    },
-    
+                    const data = await res.json();
+                    if (window.SystemLog) SystemLog.write('AI', '收到回复', data);
+
+                    if (!data.choices || data.choices.length === 0) {
+                        throw new Error(`API返回内容为空`);
+                    }
+                    return data.choices[0].message.content;
+                });
+            },
+
             // --- 情感分析器：给本地语音加点“料” ---
             analyzeEmotion: (text) => {
                 let speed = 1.0; // 默认语速
@@ -7166,35 +7389,40 @@
 
                 // 2. 结合角色基础设定
                 // 最终语速 = 角色设定语速 * 情感语速
-                const baseSpeed = parseFloat(charSettings.voiceSpeed || 1.0);
+                const settings = charSettings || {};
+                const baseSpeed = parseFloat(settings.voiceSpeed || 1.0);
                 const finalSpeed = baseSpeed * emotion.speed;
 
                 try {
                     // --- 分支 A: 本地 Browser TTS (MultiTTS) ---
                     // 这是你现在用的方案，完全免费
                     if (globalTTS.engine === 'browser') {
-                        const u = new SpeechSynthesisUtterance(text);
-                        u.lang = 'zh-CN';
+                        return new Promise((resolve) => {
+                            const u = new SpeechSynthesisUtterance(text);
+                            u.lang = 'zh-CN';
 
-                        // 【注入灵魂】应用动态语速和语调
-                        u.rate = finalSpeed;
-                        u.pitch = emotion.pitch;
+                            // 【注入灵魂】应用动态语速和语调
+                            u.rate = finalSpeed;
+                            u.pitch = emotion.pitch;
 
-                        // 兼容性保护：防止参数越界导致不发声
-                        if (u.rate < 0.1) u.rate = 0.1; if (u.rate > 2) u.rate = 2;
-                        if (u.pitch < 0.1) u.pitch = 0.1; if (u.pitch > 2) u.pitch = 2;
+                            // 兼容性保护：防止参数越界导致不发声
+                            if (u.rate < 0.1) u.rate = 0.1; if (u.rate > 2) u.rate = 2;
+                            if (u.pitch < 0.1) u.pitch = 0.1; if (u.pitch > 2) u.pitch = 2;
 
-                        u.onend = function () {
-                            if (WeChatUI.isSpeaking) {
-                                WeChatUI.isSpeaking = false;
-                                setTimeout(() => WeChatUI.processTTSQueue(), 200);
-                            }
-                        };
+                            u.onend = function () {
+                                if (window.SystemLog) SystemLog.write('SYS', '本地语音播放完成', text.substring(0, 20));
+                                resolve('browser-tts-done'); // 返回特殊标记表示播放完成
+                            };
 
-                        window.speechSynthesis.speak(u);
+                            u.onerror = function (e) {
+                                console.error('浏览器TTS错误:', e);
+                                resolve(null); // 出错时返回null
+                            };
 
-                        if (window.SystemLog) SystemLog.write('SYS', '本地语音播放', `语速:${u.rate.toFixed(1)} 语调:${u.pitch.toFixed(1)}`);
-                        return null;
+                            window.speechSynthesis.speak(u);
+
+                            if (window.SystemLog) SystemLog.write('SYS', '本地语音播放', `语速:${u.rate.toFixed(1)} 语调:${u.pitch.toFixed(1)}`);
+                        });
                     }
 
                     // --- 分支 B: MiniMax (保留代码以备不时之需) ---
@@ -10726,21 +10954,31 @@
                 const { text, char } = WeChatUI.ttsQueue.shift();
 
                 setTimeout(() => {
-                    SettingsLogic.generateTTS(text, char).then(url => {
-                        if (url) {
-                            const audio = new Audio(url);
+                    SettingsLogic.generateTTS(text, char).then(result => {
+                        // 浏览器TTS：已经播放完成，result为'browser-tts-done'
+                        if (result === 'browser-tts-done') {
+                            WeChatUI.isSpeaking = false;
+                            setTimeout(() => {
+                                WeChatUI.processTTSQueue();
+                            }, 300); // 稍微停顿0.3秒再读下一句，更自然
+                        }
+                        // API TTS：result为音频URL
+                        else if (result && result.startsWith('data:audio')) {
+                            const audio = new Audio(result);
                             audio.onended = () => {
                                 WeChatUI.isSpeaking = false;
                                 setTimeout(() => {
                                     WeChatUI.processTTSQueue();
-                                }, 200); // 稍微停顿0.2秒再读下一句，更自然
+                                }, 300); // 稍微停顿0.3秒再读下一句，更自然
                             };
                             audio.play().catch(error => {
                                 console.error('TTS播放失败:', error);
                                 WeChatUI.isSpeaking = false;
                                 WeChatUI.processTTSQueue();
                             });
-                        } else {
+                        }
+                        // 失败或返回null
+                        else {
                             WeChatUI.isSpeaking = false;
                             WeChatUI.processTTSQueue();
                         }
@@ -10877,7 +11115,6 @@
                 WeChatUI.activeChatTimer = setInterval(() => {
                     const now = Date.now();
                     const chars = AppStorage.get('wechat_chars', {});
-                    let needSave = false;
 
                     // 1. 获取当前屏幕上正在聊的"正宫"是谁
                     const chatPage = document.getElementById('subpage-chat-detail');
@@ -10888,189 +11125,344 @@
                         // 开关检查
                         if (!char.activeChat) return;
 
-                        // --- 核心逻辑修改：使用最后一条消息时间作为计时起点 ---
-                        let lastInteractionTime;
-
-                        // 获取最后一条消息的时间
-                        if (char.msgs && char.msgs.length > 0) {
-                            // 筛选出有效的聊天消息（排除系统消息）
-                            const validMsgs = char.msgs.filter(msg => msg.type !== 'system' && msg.type !== 'error');
-                            if (validMsgs.length > 0) {
-                                // 按时间戳排序，取最后一条
-                                const lastMsg = validMsgs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
-                                lastInteractionTime = lastMsg.timestamp || now;
-                            } else {
-                                lastInteractionTime = now;
-                            }
-                        } else {
-                            lastInteractionTime = now;
+                        // 如果当前正在聊天界面，不触发查岗
+                        if (char.id === currentOpenCharId) {
+                            return; // 用户正在看这个角色，不需要查岗
                         }
 
-                        // 如果当前正在聊天界面，更新最后交互时间
-                        if (char.id === currentOpenCharId) {
-                            // 情况A：你正在看着这个角色，重置计时
-                            lastInteractionTime = now;
-                        } else {
-                            // 情况B：你没在看他 (你在桌面、后台、或者在跟别人聊天)
-                            const timeGap = now - lastInteractionTime;
-                            const settingInterval = (parseInt(char.activeInterval) || 30) * 60 * 1000;
+                        // --- 【核心修改】使用 lastLeaveTime 作为计时起点 ---
+                        const lastLeaveTime = char.lastLeaveTime || 0;
 
-                            // 触发判断：
-                            if (timeGap >= settingInterval && (!char.unread || char.unread === 0)) {
-                                console.log(`[查岗触发] ${char.name} 觉得自己被冷落了 ${(timeGap / 60000).toFixed(1)}分钟`);
+                        // 如果没有离开时间记录，跳过（说明用户从未打开过这个聊天）
+                        if (!lastLeaveTime) return;
 
-                                // 触发消息
-                                WeChatUI.triggerActiveMessage(char, timeGap, true);
+                        // 计算从离开界面到现在的时间
+                        const timeSinceLeave = now - lastLeaveTime;
+                        const settingInterval = (parseInt(char.activeInterval) || 30) * 60 * 1000;
+
+                        // 触发判断：离开时间 >= 设定时间，且没有未读消息
+                        if (timeSinceLeave >= settingInterval && (!char.unread || char.unread === 0)) {
+
+                            // 计算从最后一条消息算起的实际沉默时长（这是AI感知的时间）
+                            let lastMsgTime = now;
+                            if (char.msgs && char.msgs.length > 0) {
+                                const validMsgs = char.msgs.filter(msg => msg.type !== 'system' && msg.type !== 'error');
+                                if (validMsgs.length > 0) {
+                                    const lastMsg = validMsgs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))[0];
+                                    lastMsgTime = lastMsg.timestamp || now;
+                                }
                             }
+                            const silentTime = now - lastMsgTime; // AI感知的沉默时长
+
+                            console.log(`[查岗触发] ${char.name}: 离开界面${(timeSinceLeave / 60000).toFixed(1)}分钟，实际沉默${(silentTime / 60000).toFixed(1)}分钟`);
+
+                            // 触发消息，传入实际沉默时长（让AI知道用户沉默了多久）
+                            WeChatUI.triggerActiveMessage(char, silentTime, true);
                         }
                     });
                 }, 10000); // 10秒轮询一次
             },
 
             // 触发主动消息
-            // 触发主动消息 (修复版：正确保存消息到对应角色) 
-            triggerActiveMessage: async (char, timeGap, isHidden) => {
+            // 【重写版】使用完整角色人设，自然延续话题
+            // 修复：使用 APIQueue 排队，完善分句和内容处理逻辑
+            // 【⚠️高危核心区域】主动消息触发器 - 修改需慎重！
+            // 此函数包含复杂的逻辑：
+            // 1. API排队 (window.APIQueue.add) - 必须保留排队机制。
+            // 2. 强制分句 (replace特殊的语音/图片标签) - 必须在 split 之前处理。
+            // 3. 这里的 Prompt 必须与 SettingsLogic.generateLLM 中的 System Prompt 保持一致（或更强）。
+            // 修改前请先备份，或询问用户。
+            triggerActiveMessage: async (char, silentTime, isHidden) => {
                 const now = Date.now();
                 const lastTrigger = char.lastActiveTrigger || 0;
                 if (now - lastTrigger < 60000) return; // 加锁：至少间隔1分钟 
 
-                // 1. 读取历史消息 
-                const allMsgs = (char.msgs || []).filter(m => m.type !== 'system' && m.type !== 'error');
-                const recentMsgs = allMsgs.slice(-15).map(m => {
-                    const roleName = m.role === 'user' ? '用户' : char.name;
-                    const content = m.type === 'text' ? m.content : '[图片/语音]';
-                    return `${roleName}: ${content}`;
-                }).join('\n');
+                // 计算沉默分钟数
+                const silentMinutes = Math.floor(silentTime / 60000);
 
-                // 获取最后一条消息内容（可能是用户的也可能是AI的）
+                // 获取最后一条消息内容（用于提示AI）
+                const allMsgs = (char.msgs || []).filter(m => m.type !== 'system' && m.type !== 'error');
                 const lastMsg = allMsgs[allMsgs.length - 1];
                 const lastMsgRole = lastMsg ? (lastMsg.role === 'user' ? '用户' : char.name) : '';
                 const lastMsgContent = lastMsg ? (lastMsg.type === 'text' ? lastMsg.content : '[图片/语音]') : '';
 
-                const minutes = Math.floor(timeGap / 60000);
-
-                // 2. Prompt - 明确要求基于最后一条消息继续话题
-                let systemInstruction = ` 
- 你现在必须完全**变成**角色 "${char.name}" 本人。 
- **禁止**扮演 "AI助手"，**禁止**解释你在做什么，**禁止**输出 "好的"、"方案" 等废话。 
- 直接以 "${char.name}" 的口吻给用户发一条微信。 
-
- **当前情况**: 
- 1. 你们刚才在聊天，但用户突然消失了 ${minutes} 分钟没有回你。 
- 2. 你的心情：${isHidden ? '担心、疑惑（因为用户手机可能锁屏了）' : '有点吃醋、想引起注意（因为用户在线却不理你）'}。 
- 3. 你的性格：${char.prompt || char.personality || '保持一贯风格'}。 
-
- **聊天内容回顾**：
- 最后一条消息是【${lastMsgRole}】说的："${lastMsgContent}"
-
- **绝对指令**: 
- - **【核心要求】你的消息必须紧接着最后一条聊天内容的话题和氛围，自然地延续对话**
- - 如果最后一条是你（${char.name}）说的，现在用户${minutes}分钟没理你，你应该根据那条消息的内容催促/追问/抱怨/关心
- - 如果最后一条是用户说的，你应该基于用户那句话的内容做出延续反应，表达"你怎么不回我了"的意思
- - **不要**突然换话题或说无关的话
- - **允许使用括号/动作描写**（如果这是你平时聊天的习惯）
- - 只输出**一句**你发给用户的微信内容
- - 【强制】必须按照中文聊天习惯分句，每一小句话后面加上###分隔句子！
- - 【绝对强制】必须按照格式分句，每一小句话后面加上###分隔句子！
- `;
-
-                const finalPrompt = `${systemInstruction} 
-
- 【最近聊天记录】（供参考上下文） 
- ${recentMsgs} 
- 
- 【重点】最后一条消息："${lastMsgRole}: ${lastMsgContent}"
- （用户已沉默 ${minutes} 分钟...） 
-
- 【你（${char.name}）现在要发给用户的消息】：`;
-
                 // 更新时间，防止重复触发 
-                localStorage.setItem('last_interaction_time', Date.now());
                 const chars = AppStorage.get('wechat_chars', {});
                 if (chars[char.id]) {
                     chars[char.id].lastActiveTrigger = Date.now();
+                    // 重置离开时间，避免重复触发
+                    chars[char.id].lastLeaveTime = Date.now();
                     AppStorage.set('wechat_chars', chars);
                 }
 
                 try {
-                    const config = SettingsLogic.configs.find(c => c.id === SettingsLogic.currentId);
-                    // 容错处理：如果配置为空，使用默认回复 
-                    let reply = "";
+                    // 【核心改动】构建“沉默提示”消息
+                    // 强制要求使用 ### 分句，并明确可以使用表情包
+                    const silentHint = `[System Hint: User has been silent for ${silentMinutes} mins. Last message from ${lastMsgRole}: "${lastMsgContent}". 
+Please initiate a conversation naturally based on context and persona. 
+IMPORTANT: 
+1. Separate your sentences with "###". 
+2. Use [表情包: Name] for emojis. 
+3. Use [INNER_VOICE]...[/INNER_VOICE] for thoughts.
+4. Keep it casual and engaging.]`;
 
-                    if (!config || !config.key) {
-                        console.warn("查岗API未配置，使用随机回复");
-                        const defaults = ["人呢？", "去哪了？", "怎么不理我...", "歪？", "在忙吗？"];
-                        reply = defaults[Math.floor(Math.random() * defaults.length)];
-                    } else {
-                        // 正常请求 AI 
-                        let endpoint = config.url.replace(/\/$/, '');
-                        if (!endpoint.endsWith('/chat/completions')) {
-                            if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
-                            else endpoint += '/v1/chat/completions';
+                    // 构建与正常聊天相同的消息格式
+                    const systemMessages = [{
+                        role: 'system',
+                        content: char.prompt || '你是一个友好的朋友。'
+                    }];
+
+                    // 【核心修复】使用 APIQueue 进行排队，防止并发冲突
+                    const reply = await window.APIQueue.add(() => SettingsLogic.generateLLM([
+                        ...systemMessages,
+                        { role: 'user', content: silentHint }
+                    ], char.id));
+
+                    // 处理回复
+                    if (reply && reply.trim()) {
+                        let processedReply = reply.trim();
+                        const cid = char.id;
+
+                        // 1. 提取並保存心聲 (如果存在)
+                        const innerVoiceMatch = processedReply.match(/\[INNER_VOICE\]([\s\S]*?)\[\/INNER_VOICE\]/i);
+                        if (innerVoiceMatch) {
+                            try {
+                                let voiceJsonStr = innerVoiceMatch[1].replace(/```json/g, '').replace(/```/g, '').trim();
+                                const jsonMatch = voiceJsonStr.match(/\{[\s\S]*\}/);
+                                if (jsonMatch) {
+                                    const voiceJson = JSON.parse(jsonMatch[0]);
+                                    const voiceText = {
+                                        着装: voiceJson.着装 || voiceJson.outfit || '-',
+                                        环境: voiceJson.环境 || voiceJson.scene || '-',
+                                        心声: voiceJson.心声 || voiceJson.thoughts || '-',
+                                        行为: voiceJson.行为 || voiceJson.action || '-'
+                                    };
+                                    // 保存心声
+                                    if (window.InnerVoiceUI) InnerVoiceUI.addVoice(voiceText);
+                                    if (window.SystemLog) SystemLog.write('AI', '主动消息心声', JSON.stringify(voiceText));
+                                }
+                            } catch (e) {
+                                console.error("主动消息心声解析失败", e);
+                            }
+                            processedReply = processedReply.replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '').trim();
                         }
 
-                        const payload = {
-                            model: config.model,
-                            messages: [{ role: 'system', content: finalPrompt }],
-                            temperature: 1.1,
-                            max_tokens: 150
-                        };
+                        // 2. 清理多余标签
+                        processedReply = processedReply.replace(/^["']|["']$/g, '');
+                        processedReply = processedReply.replace(/^(他|她|我)说[:：]/, '');
+                        processedReply = processedReply.replace(/^\[System Hint.*?\]/i, '');
 
-                        const res = await fetch(endpoint, {
-                            method: 'POST',
-                            headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
+                        // 3. 智能分句 (增强版)
+                        // 【核心修复】强制在特殊标签前后插入分句符，防止AI没分句导致语音/图片混在文本里
+                        processedReply = processedReply.replace(/(\[(?:语音|voice|图片|image|表情包)[:：].*?\])/gi, '###$1###');
+
+                        // 优先按 ### 切分
+                        let segments = processedReply.split(/\s*###\s*/);
+
+                        // 如果没有 ###，或者分段太少，尝试按标点分句（兜底）
+                        if (segments.length === 1 && processedReply.length > 50) {
+                            segments = processedReply
+                                .replace(/([。！？；：])/g, '$1###')
+                                .replace(/(，)/g, '$1') // 逗号不分
+                                .split('###');
+                        }
+
+                        // 4. 逐条发送
+                        segments = segments.filter(s => s.trim());
+
+                        segments.forEach((seg, idx) => {
+                            seg = seg.trim();
+                            if (!seg) return;
+
+                            setTimeout(() => {
+                                // 检查是否是特殊格式
+                                let type = 'text';
+                                let content = seg;
+                                let emojiName = null;
+
+                                // 检查图片/表情包
+                                if (seg.match(/^\[(图片|image)[:：]\s*(https?:\/\/.*?)\]$/i)) {
+                                    type = 'image';
+                                    content = seg.replace(/^\[(图片|image)[:：]\s*(.*?)\]$/i, '$2');
+                                } else if (seg.match(/^\[表情包[:：]\s*(.*?)\]$/i)) {
+                                    type = 'image';
+                                    emojiName = seg.match(/^\[表情包[:：]\s*(.*?)\]$/i)[1];
+                                    // 这里 content 需要是 URL，需要查找 URL
+                                    // 为简化，交给 pushMessage 处理 emojiName
+                                    const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+                                    const charEmojis = char.emojis || [];
+                                    const allEmojis = [...globalEmojis, ...charEmojis];
+                                    const targetEmoji = allEmojis.find(e => e.name === emojiName);
+                                    if (targetEmoji) {
+                                        content = targetEmoji.url;
+                                    } else {
+                                        // 找不到表情包，回退为文本
+                                        type = 'text';
+                                        content = `[表情包: ${emojiName}]`;
+                                        emojiName = null;
+                                    }
+                                    // 【新】检查语音
+                                } else if (seg.match(/^\[(?:语音|voice)[:：]\s*(.*?)\]$/i)) {
+                                    type = 'voice';
+                                    content = seg.match(/^\[(?:语音|voice)[:：]\s*(.*?)\]$/i)[1].replace(/^["“”]/, '').replace(/["“”]$/, '');
+                                }
+
+                                WeChatUI.pushMessage(type, content, 'ai', type === 'voice' ? 'voice' : 'text', emojiName, char.id);
+                            }, idx * 1500); // 间隔 1.5秒发一条，更自然
                         });
 
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.choices && data.choices.length > 0) {
-                                reply = data.choices[0].message.content.trim();
-                            }
-                        }
-                    }
-
-                    // 如果拿到了回复（无论是AI生成的还是默认的） 
-                    if (reply) {
-                        // 清洗 
-                        reply = reply.replace(/^["']|["']$/g, '');
-                        reply = reply.replace(/^(他|她|我)说[:：]/, '');
-                        if (reply.includes("：") && reply.length < 10) {
-                            const parts = reply.split("：");
-                            if (parts.length > 1) reply = parts[parts.length - 1];
-                        }
-
-                        // 确保AI回复使用###分句
-                        if (!reply.includes('###')) {
-                            // 简单分句逻辑：按中文标点分句
-                            reply = reply
-                                .replace(/([。！？；：])/g, '$1###')
-                                .replace(/(，)/g, '$1')
-                                .trim();
-                            // 如果最后没有###，则添加
-                            if (!reply.endsWith('###')) {
-                                reply += '###';
-                            }
-                        }
-
-                        // 【关键修正点】调用 pushMessage 时，传入第 6 个参数 char.id 
-                        // 参数顺序：type, content, role, msgType, emojiName, targetCharId 
-                        WeChatUI.pushMessage('text', reply, 'ai', 'text', null, char.id);
-
-                        // 浏览器通知 
+                        // 5. 浏览器通知 (只显示第一句)
+                        const firstSeg = segments.length > 0 ? segments[0] : processedReply;
                         if (isHidden && Notification.permission === "granted") {
-                            const notif = new Notification(char.name, { body: reply, icon: char.avatar });
-                            // 点击通知跳转 
+                            const notif = new Notification(char.name, { body: firstSeg, icon: char.avatar });
                             notif.onclick = () => {
-                                window.focus(); // 激活窗口 
+                                window.focus();
                                 document.getElementById('global-notification-modal').style.display = 'none';
-                                WeChatUI.openChatDetail(char.id); // 跳转到聊天 
+                                WeChatUI.openChatDetail(char.id);
                             };
                         }
 
-                        Utils.showToast(`${char.name}: ${reply.substring(0, 10)}...`);
+                        Utils.showToast(`${char.name}: ${firstSeg.substring(0, 10)}...`);
+                        console.log(`[查岗/主动消息] ${char.name} 发送了 ${segments.length} 条消息`);
                     }
-                } catch (e) { console.error('查岗失败', e); }
+                } catch (e) {
+                    console.error('主动消息/查岗失败', e);
+                    // 降级处理：使用默认消息
+                    /* const defaults = ["人呢？", "去哪了？", "怎么不理我...", "歪？", "在忙吗？"];
+                     const fallback = defaults[Math.floor(Math.random() * defaults.length)];
+                     WeChatUI.pushMessage('text', fallback, 'ai', 'text', null, char.id);*/
+                }
+            },
+
+            // 【主动发消息】计时器变量
+            proactiveChatTimer: null,
+            lastProactiveTrigger: 0,
+
+            // 【主动发消息】启动计时器 - 用户在聊天界面时AI主动发消息
+            startProactiveChatTimer: (charId) => {
+                // 清除旧计时器
+                if (WeChatUI.proactiveChatTimer) {
+                    clearInterval(WeChatUI.proactiveChatTimer);
+                }
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[charId];
+                if (!char || !char.proactiveChat) {
+                    console.log(`[主动发消息] ${char?.name || charId} 未开启主动发消息功能`);
+                    return;
+                }
+
+                const intervalMs = (char.proactiveInterval || 60) * 1000; // 默认60秒
+                console.log(`[主动发消息] 启动计时器，角色: ${char.name}，间隔: ${char.proactiveInterval || 60}秒`);
+
+                WeChatUI.proactiveChatTimer = setInterval(() => {
+                    // 检查聊天界面是否仍然打开
+                    const chatPage = document.getElementById('subpage-chat-detail');
+                    const isChatOpen = chatPage && chatPage.classList.contains('active');
+                    const currentCharId = chatPage ? chatPage.dataset.charId : null;
+
+                    if (!isChatOpen || currentCharId !== charId) {
+                        console.log(`[主动发消息] 聊天界面已关闭或切换，停止计时器`);
+                        clearInterval(WeChatUI.proactiveChatTimer);
+                        WeChatUI.proactiveChatTimer = null;
+                        return;
+                    }
+
+                    // 检查是否正在生成回复（避免冲突）
+                    if (WeChatUI.isGenerating) {
+                        console.log(`[主动发消息] AI正在生成回复，跳过本次触发`);
+                        return;
+                    }
+
+                    // 触发主动消息
+                    WeChatUI.triggerProactiveMessage(charId);
+                }, intervalMs);
+            },
+
+            // 【主动发消息】触发主动消息 - 让AI像朋友一样分享日常或延续话题
+            triggerProactiveMessage: async (charId) => {
+                const now = Date.now();
+                // 防止频繁触发（至少间隔30秒）
+                if (now - WeChatUI.lastProactiveTrigger < 30000) {
+                    console.log(`[主动发消息] 距离上次触发不足30秒，跳过`);
+                    return;
+                }
+                WeChatUI.lastProactiveTrigger = now;
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[charId];
+                if (!char) return;
+
+                console.log(`[主动发消息] ${char.name} 正在生成主动消息...`);
+
+                // 获取最后一条消息内容
+                const allMsgs = (char.msgs || []).filter(m => m.type !== 'system' && m.type !== 'error');
+                const lastMsg = allMsgs[allMsgs.length - 1];
+                const lastMsgContent = lastMsg ? lastMsg.content : '（无消息）';
+                const lastMsgRole = lastMsg ? (lastMsg.role === 'user' ? '用户' : '你') : '';
+
+                // 计算从最后一条消息到现在的时间
+                const lastMsgTime = lastMsg ? lastMsg.timestamp : now;
+                const silentSeconds = Math.floor((now - lastMsgTime) / 1000);
+
+                // 构建提示，让AI自然地发起话题
+                const proactiveHint = `【系统提示·主动发消息】
+当前距离上一条消息已过去${silentSeconds}秒。${lastMsgRole ? `最后一条消息是${lastMsgRole}说的："${lastMsgContent.substring(0, 50)}${lastMsgContent.length > 50 ? '...' : ''}"` : ''}
+请你作为${char.name}，**主动发起一条消息**。可以是：
+- 分享你正在做的事、看到的东西、想到的事情
+- 突然想起什么想告诉对方
+- 看到什么有趣的东西想分享
+- 想到刚才的话题有什么想补充的
+- 或者只是单纯想和对方说说话
+保持你的人设性格，自然随意，就像朋友之间发消息一样。不要重复之前说过的内容。回复用###分隔自然停顿处。`;
+
+                try {
+                    // 构建消息历史
+                    const apiMsgs = [];
+                    const recentMsgs = allMsgs.slice(-10); // 取最近10条消息作为上下文
+
+                    recentMsgs.forEach(m => {
+                        if (m.role === 'user') {
+                            apiMsgs.push({ role: 'user', content: m.content });
+                        } else if (m.role === 'ai') {
+                            apiMsgs.push({ role: 'assistant', content: m.content });
+                        }
+                    });
+
+                    // 添加主动发消息提示
+                    apiMsgs.push({ role: 'system', content: proactiveHint });
+
+                    // 调用完整的AI生成
+                    const reply = await SettingsLogic.generateLLM(apiMsgs, charId);
+
+                    if (reply && reply.trim()) {
+                        let processedReply = reply.trim();
+
+                        // 清洗回复
+                        processedReply = processedReply.replace(/^["']|["']$/g, '');
+                        processedReply = processedReply.replace(/^(他|她|我)说[:：]/, '');
+                        processedReply = processedReply.replace(/^\[.*?\][:：]?\s*/, '');
+
+                        // 确保使用###分句
+                        if (!processedReply.includes('###')) {
+                            processedReply = processedReply
+                                .replace(/([。！？；：])/g, '$1###')
+                                .trim();
+                        }
+
+                        // 按###分割后分别发送消息
+                        const segments = processedReply.split('###').filter(seg => seg.trim());
+                        segments.forEach((seg, idx) => {
+                            setTimeout(() => {
+                                WeChatUI.pushMessage('text', seg.trim(), 'ai', 'text', null, charId);
+                            }, idx * 100);
+                        });
+
+                        console.log(`[主动发消息完成] ${char.name} 发送了主动消息`);
+                    }
+                } catch (e) {
+                    console.error('[主动发消息失败]', e);
+                }
             },
 
             // Initialize default test user if empty
@@ -11452,6 +11844,8 @@
                 document.getElementById('char-virtual-time').value = c.virtualTime || '';
                 document.getElementById('char-active-chat-switch').checked = c.activeChat || false;
                 document.getElementById('char-active-interval').value = c.activeInterval || 30;
+                document.getElementById('char-proactive-chat-switch').checked = c.proactiveChat || false;
+                document.getElementById('char-proactive-interval').value = c.proactiveInterval || 5;
                 document.getElementById('char-pat-action').value = c.patAction || '';
                 document.getElementById('char-pat-suffix').value = c.patSuffix || '';
                 WeChatUI.toggleTimeSetting();
@@ -11610,9 +12004,12 @@
                 c.voiceSpeed = getVal('char-voice-speed') || 1.0;
                 c.timeAware = getCheck('char-time-aware');
                 c.virtualTime = getVal('char-virtual-time');
-                // 主动发消息设置
+                // 查岗设置
                 c.activeChat = getCheck('char-active-chat-switch');
                 c.activeInterval = parseInt(getVal('char-active-interval')) || 30;
+                // 主动发消息设置 (用户在聊天界面时)
+                c.proactiveChat = getCheck('char-proactive-chat-switch');
+                c.proactiveInterval = parseInt(getVal('char-proactive-interval')) || 60;
 
                 // --- 3. 检查昵称是否修改 (触发系统提示) ---
                 if (c.nickname !== oldNickname) {
@@ -11927,56 +12324,74 @@
                 const charEmojis = c.emojis || [];
                 const allEmojis = [...globalEmojis, ...charEmojis];
 
-                if (panel.style.display === 'grid') {
+                if (panel.style.display === 'flex' || panel.style.display === 'block') {
                     panel.style.display = 'none';
                 } else {
                     // 1. 清除旧样式干扰
                     panel.removeAttribute('style');
 
-                    // 2. 设置面板样式 (5列布局)
-                    panel.style.display = 'grid';
-                    panel.style.gridTemplateColumns = 'repeat(5, 1fr)';
-                    panel.style.gap = '6px';
-                    panel.style.padding = '10px';
+                    // 2. 设置面板样式 (flex布局包含搜索框和表情网格)
+                    panel.style.display = 'flex';
+                    panel.style.flexDirection = 'column';
                     panel.style.backgroundColor = '#f2f2f2';
-                    panel.style.height = '280px';
-                    panel.style.overflowY = 'auto';
-                    panel.style.overflowX = 'hidden';
+                    panel.style.height = '320px';
                     panel.style.borderTop = '1px solid #e5e5e5';
-                    panel.style.marginTop = '0px';
                     panel.style.width = '100%';
+                    panel.style.padding = '10px';
+                    panel.style.boxSizing = 'border-box';
 
-                    if (allEmojis.length > 0) {
-                        panel.innerHTML = allEmojis.map((emoji, index) => {
-                            // 处理名字：太长就截断，如果没有名字显示“表情”
-                            let displayName = emoji.name || '表情';
+                    // 渲染表情包的函数
+                    const renderEmojis = (emojis) => {
+                        const gridEl = document.getElementById('emoji-picker-grid');
+                        if (!gridEl) return;
 
-                            return `
-                            <div class="bg-white rounded-lg shadow-sm relative border border-gray-200 active:scale-95 transition-transform" 
-                                 style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 90px; padding: 6px; overflow: hidden;"
-                                 onclick="WeChatUI.pushMessage('image', '${emoji.url || emoji}', 'user', 'image', '${encodeURIComponent(displayName)}')">
-                                
-                                <div style="flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; margin-bottom: 2px;">
-                                    <img src="${emoji.url || emoji}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                        if (emojis.length > 0) {
+                            gridEl.innerHTML = emojis.map((emoji, index) => {
+                                let displayName = emoji.name || '表情';
+                                return `
+                                <div class="bg-white rounded-lg shadow-sm relative border border-gray-200 active:scale-95 transition-transform" 
+                                     style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 90px; padding: 6px; overflow: hidden;"
+                                     onclick="WeChatUI.pushMessage('image', '${emoji.url || emoji}', 'user', 'image', '${encodeURIComponent(displayName)}')">
+                                    
+                                    <div style="flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; margin-bottom: 2px;">
+                                        <img src="${emoji.url || emoji}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                    </div>
+                                    
+                                    <div style="font-size: 10px; color: #666; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 14px; line-height: 14px; flex-shrink: 0;">
+                                        ${displayName}
+                                    </div>
+                                    
+                                    <div class="absolute top-0.5 right-0.5 text-[8px] px-1 py-0.5 rounded shadow-sm scale-75 origin-top-right ${emoji.type === 'global' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}">
+                                        ${emoji.type === 'global' ? '全' : '专'}
+                                    </div>
                                 </div>
-                                
-                                <div style="font-size: 10px; color: #666; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 14px; line-height: 14px; flex-shrink: 0;">
-                                    ${displayName}
-                                </div>
-                                
-                                <div class="absolute top-0.5 right-0.5 text-[8px] px-1 py-0.5 rounded shadow-sm scale-75 origin-top-right ${emoji.type === 'global' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}">
-                                    ${emoji.type === 'global' ? '全' : '专'}
-                                </div>
-                            </div>
-                            `;
-                        }).join('');
-                    } else {
-                        // 无数据时的样式
-                        panel.style.display = 'flex';
-                        panel.style.alignItems = 'center';
-                        panel.style.justifyContent = 'center';
-                        panel.innerHTML = '<div class="text-gray-400 text-sm">暂无表情包<br>请去“角色设置”添加</div>';
-                    }
+                                `;
+                            }).join('');
+                        } else {
+                            gridEl.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 col-span-5">没有找到匹配的表情包</div>';
+                        }
+                    };
+
+                    // 构建搜索框和表情网格
+                    panel.innerHTML = `
+                        <div style="margin-bottom: 8px; display: flex; gap: 6px;">
+                            <input type="text" id="emoji-search-input" placeholder="🔍 搜索表情包名称..." 
+                                   style="flex: 1; padding: 8px 12px; border-radius: 20px; border: 1px solid #ddd; font-size: 14px; outline: none;"
+                                   oninput="WeChatUI.filterEmojiPicker(this.value)">
+                            <button onclick="document.getElementById('emoji-search-input').value=''; WeChatUI.filterEmojiPicker('');" 
+                                    style="padding: 8px 12px; border-radius: 20px; border: 1px solid #ddd; background: white; font-size: 12px; cursor: pointer;">
+                                清空
+                            </button>
+                        </div>
+                        <div id="emoji-picker-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; flex: 1; overflow-y: auto; overflow-x: hidden;">
+                        </div>
+                    `;
+
+                    // 存储所有表情包供搜索使用
+                    WeChatUI.currentEmojiList = allEmojis;
+
+                    // 渲染所有表情包
+                    renderEmojis(allEmojis);
 
                     // 滚动到底部
                     setTimeout(() => {
@@ -11991,6 +12406,62 @@
                 }
             },
 
+            // 表情包搜索过滤
+            filterEmojiPicker: (keyword) => {
+                const allEmojis = WeChatUI.currentEmojiList || [];
+                const gridEl = document.getElementById('emoji-picker-grid');
+                if (!gridEl) return;
+
+                const filtered = keyword.trim()
+                    ? allEmojis.filter(emoji => {
+                        const name = (emoji.name || '').toLowerCase();
+                        return name.includes(keyword.toLowerCase());
+                    })
+                    : allEmojis;
+
+                if (filtered.length > 0) {
+                    gridEl.innerHTML = filtered.map((emoji, index) => {
+                        let displayName = emoji.name || '表情';
+                        return `
+                        <div class="bg-white rounded-lg shadow-sm relative border border-gray-200 active:scale-95 transition-transform" 
+                             style="display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 90px; padding: 6px; overflow: hidden;"
+                             onclick="WeChatUI.pushMessage('image', '${emoji.url || emoji}', 'user', 'image', '${encodeURIComponent(displayName)}')">
+                            
+                            <div style="flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 0; margin-bottom: 2px;">
+                                <img src="${emoji.url || emoji}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            </div>
+                            
+                            <div style="font-size: 10px; color: #666; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 14px; line-height: 14px; flex-shrink: 0;">
+                                ${displayName}
+                            </div>
+                            
+                            <div class="absolute top-0.5 right-0.5 text-[8px] px-1 py-0.5 rounded shadow-sm scale-75 origin-top-right ${emoji.type === 'global' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}">
+                                ${emoji.type === 'global' ? '全' : '专'}
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                } else {
+                    gridEl.innerHTML = '<div class="text-gray-400 text-sm text-center py-8 col-span-5">没有找到匹配的表情包</div>';
+                }
+            },
+
+
+            // 表情包翻转显示名称
+            toggleEmojiName: (msgId) => {
+                const container = document.getElementById(`emoji-${msgId}`);
+                if (!container) return;
+
+                const inner = container.querySelector('.emoji-flip-inner');
+                if (!inner) return;
+
+                // 切换翻转状态
+                const isFlipped = inner.style.transform === 'rotateY(180deg)';
+                inner.style.transform = isFlipped ? 'rotateY(0deg)' : 'rotateY(180deg)';
+
+                // 阻止事件冒泡，防止触发其他点击事件
+                event.stopPropagation();
+            },
 
             // 打开记忆库并渲染列表
             openMemoryLib: () => {
@@ -12880,26 +13351,30 @@
                     // ... (在 loadChat 函数内)
                     if (c.chatBg) {
                         // 设置白色作为底层背景，自定义背景图放在上层
-                        bgLayer.style.backgroundImage = `url(${c.chatBg})`;
-                        bgLayer.style.backgroundColor = 'white';
-                        bgLayer.style.backgroundSize = 'cover';
-                        bgLayer.style.backgroundPosition = 'center';
-                        bgLayer.style.backgroundRepeat = 'no-repeat';
+                        if (bgLayer) {
+                            bgLayer.style.backgroundImage = `url(${c.chatBg})`;
+                            bgLayer.style.backgroundColor = 'white';
+                            bgLayer.style.backgroundSize = 'cover';
+                            bgLayer.style.backgroundPosition = 'center';
+                            bgLayer.style.backgroundRepeat = 'no-repeat';
+                        }
                         // 应用模糊效果
-                        bgLayer.style.filter = `blur(${c.bgBlur || 0}px)`;
+                        if (bgLayer) bgLayer.style.filter = `blur(${c.bgBlur || 0}px)`;
                         // 设置背景透明度
                         const opacity = c.bgOpacity !== undefined ? c.bgOpacity : 1;
-                        bgLayer.style.opacity = opacity;
+                        if (bgLayer) bgLayer.style.opacity = opacity;
                         // 【关键修复】允许触摸事件穿透背景层
-                        bgLayer.style.pointerEvents = 'none';
+                        if (bgLayer) bgLayer.style.pointerEvents = 'none';
                     }
                     else {
-                        bgLayer.style.backgroundImage = '';
-                        bgLayer.style.filter = '';
-                        // 设置白色作为默认背景
-                        bgLayer.style.background = 'white';
-                        // 【关键修复】允许触摸事件穿透背景层
-                        bgLayer.style.pointerEvents = 'none';
+                        if (bgLayer) {
+                            bgLayer.style.backgroundImage = '';
+                            bgLayer.style.filter = '';
+                            // 设置白色作为默认背景
+                            bgLayer.style.background = 'white';
+                            // 【关键修复】允许触摸事件穿透背景层
+                            bgLayer.style.pointerEvents = 'none';
+                        }
                     }
 
                     const shapeClass = c.avatarShape === 'circle' ? 'circle' : 'square';
@@ -12948,6 +13423,9 @@
                     const userProfile = AppStorage.get('wechat_user_profile', {});
 
                     const messagesHtml = currentMsgs.map((m, idx) => {
+                        // 【新增】跳过隐藏的系统消息（用于引导AI交互）
+                        if (m.hidden === true) return '';
+
                         const originalIdx = startIdx + idx;
                         const isSelf = m.role === 'user';
                         // 自己的头像：角色userAvatar -> 全局userProfile.avatar -> 随机头像
@@ -12966,7 +13444,6 @@
                         if (m.type === 'text' || m.type === 'html') {
                             let processedContent = String(m.content).replace(/```[\w]*\n?/g, '').replace(/```/g, '').trim();
                             // 【核心修复】检测并隐藏[图片：URL]格式的空白气泡
-                            // 修改正则：[:：] 同时匹配中英文冒号，确保能隐藏掉
                             if (processedContent.match(/^\[(图片|image)[:：]?\s*.*\]$/i)) {
                                 return '';
                             }
@@ -12980,11 +13457,8 @@
                                     useBubble = false;
                                     contentHtml = processedContent;
                                 }
-                                // 【核心修改】检测是否是自定义背景卡片
-                                // 如果HTML里自带了 background-color，说明是张卡片，就去掉默认气泡
                                 else if (processedContent.includes('background-color:') || processedContent.includes('background:')) {
                                     useBubble = false;
-                                    // 稍微处理一下图片URL，防止被截断
                                     const imgRegex = /<img[^>]+src\s*=\s*(["'])(.*?)\1[^>]*>/gi;
                                     contentHtml = processedContent.replace(imgRegex, (match, quote, url) => {
                                         if (!url) return match;
@@ -12992,14 +13466,12 @@
                                     });
                                 }
                                 else {
-                                    // 普通HTML消息（如加粗文字），保留气泡但修复图片显示
                                     const imgRegex = /<img[^>]+src\s*=\s*(["'])(.*?)\1[^>]*>/gi;
                                     contentHtml = processedContent.replace(imgRegex, (match, quote, url) => {
                                         if (!url) return match;
                                         return `<img src="${url.replace(/[`]/g, '')}" style="width: auto; max-width: 150px; height: auto; display: block; border-radius: 8px;" alt="">`;
                                     });
 
-                                    // 检测纯图
                                     const textOnly = contentHtml.replace(/<[^>]+>/g, '').trim();
                                     const hasImgTag = /<img/i.test(contentHtml);
                                     if (textOnly === '' && hasImgTag) {
@@ -13013,9 +13485,18 @@
                             }
                         } else if (m.type === 'image') {
                             let imgSrc = m.originalContent || m.content;
-                            // 检查是否是表情包（通过content字段判断）
-                            const isEmoji = m.content && m.content.startsWith('[表情包:');
-                            // 为表情包添加emoji类，应用更小的尺寸样式
+                            // 【修复】尝试查找表情包 URL
+                            const emojiMatch = m.content && m.content.match(/^\[(表情包|emoji)[:：]\s*(.*?)\]$/i);
+                            if (emojiMatch) {
+                                const emojiName = emojiMatch[2];
+                                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+                                const charEmojis = c ? (c.emojis || []) : [];
+                                const allEmojis = [...globalEmojis, ...charEmojis];
+                                const target = allEmojis.find(e => e.name === emojiName);
+                                if (target) imgSrc = target.url;
+                            }
+
+                            const isEmoji = !!emojiMatch;
                             const msgImageClass = isEmoji ? 'msg-image emoji' : 'msg-image';
                             contentHtml = `<div class="${msgImageClass}"><img src="${imgSrc}" style="cursor:zoom-in; width:100%; height:100%; object-fit:contain; border-radius:8px;" onclick="window.open(this.src, '_blank')"></div>`;
                             useBubble = false;
@@ -13046,12 +13527,16 @@
                             bubbleClass += ` bubble-transfer`;
                             let statusText = m.status === 'received' ? '已收款' : (m.status === 'rejected' ? '已退还' : '微信转账');
                             const cardClass = (m.status === 'received' || m.status === 'rejected') ? 'pay-card received' : 'pay-card';
-                            contentHtml = `<div class="${cardClass}" onclick="WeChatUI.handlePaymentClick(${originalIdx}, 'transfer', '${m.role}')"><div class="pay-top"><div class="pay-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></div><div class="pay-info"><div class="pay-title">¥${m.amount}</div><div class="pay-desc">${m.note}</div></div></div><div class="pay-bottom">${statusText}</div></div>`;
+                            const clickHandler = (m.status === 'received' || m.status === 'rejected') ? '' : `onclick="WeChatUI.handlePaymentClick(${originalIdx}, 'transfer', '${m.role}')"`;
+                            const cursorStyle = (m.status === 'received' || m.status === 'rejected') ? 'style="cursor: default; opacity: 0.7;"' : '';
+                            contentHtml = `<div class="${cardClass}" ${clickHandler} ${cursorStyle}><div class="pay-top"><div class="pay-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></div><div class="pay-info"><div class="pay-title">¥${m.amount}</div><div class="pay-desc">${m.note}</div></div></div><div class="pay-bottom">${statusText}</div></div>`;
                         } else if (m.type === 'redpacket') {
                             bubbleClass += ` bubble-redpacket`;
                             let statusText = m.status === 'received' ? '已领取' : (m.status === 'rejected' ? '已退还' : '微信红包');
                             const cardClass = (m.status === 'received' || m.status === 'rejected') ? 'pay-card received' : 'pay-card';
-                            contentHtml = `<div class="${cardClass}" onclick="WeChatUI.handlePaymentClick(${originalIdx}, 'redpacket', '${m.role}')"><div class="pay-top"><div class="pay-icon"><i class="fa-solid fa-envelope"></i></div><div class="pay-info"><div class="pay-title">${m.note}</div><div class="pay-desc">领取红包</div></div></div><div class="pay-bottom">${statusText}</div></div>`;
+                            const clickHandler = (m.status === 'received' || m.status === 'rejected') ? '' : `onclick="WeChatUI.handlePaymentClick(${originalIdx}, 'redpacket', '${m.role}')"`;
+                            const cursorStyle = (m.status === 'received' || m.status === 'rejected') ? 'style="cursor: default; opacity: 0.7;"' : '';
+                            contentHtml = `<div class="${cardClass}" ${clickHandler} ${cursorStyle}><div class="pay-top"><div class="pay-icon"><i class="fa-solid fa-envelope"></i></div><div class="pay-info"><div class="pay-title">${m.note}</div><div class="pay-desc">领取红包</div></div></div><div class="pay-bottom">${statusText}</div></div>`;
                         } else if (m.type === 'music') {
                             // 【新增】音乐气泡渲染逻辑
                             let info = '点击重听';
@@ -13069,21 +13554,32 @@
                             useBubble = false;
 
                         } else if (m.type === 'voice') {
+                            // 【关键修复】禁用外层默认气泡，防止“气泡套气泡”
+                            useBubble = false;
 
+                            const expandedClass = m.expanded ? 'expanded' : '';
                             const playingClass = m.playing ? 'voice-playing' : '';
 
-                            // 1. 极速语速算法：每 6 个字算 1 秒 (让秒数变小)
-                            let seconds = m.duration || Math.ceil((m.text || '').length / 6) || 1;
+                            // 1. 计算秒数
+                            let seconds = m.duration || Math.ceil((m.text || '').length / 5) || 1;
                             if (seconds > 60) seconds = 60;
 
-                            // 2. 视觉缩短算法：基础 40px，每秒只加 2px (让条子变短)
-                            const bubbleWidth = 40 + (seconds * 2.5);
-                            const widthStyle = `width: ${Math.min(bubbleWidth, 160)}px; flex: none;`;
+                            // 2. 动态宽度算法：基础70px + 每秒3.5px
+                            let bubbleWidth = 70 + (seconds * 3.5);
+                            if (bubbleWidth > 220) bubbleWidth = 220;
 
-                            contentHtml = `<div class="voice-container"><div class="voice-bubble ${playingClass}" style="${widthStyle}" onclick="WeChatUI.toggleVoiceText(${originalIdx}, '${id}', '${m.role}')"><div class="voice-icon"><i class="fa-solid fa-wifi rotate-90"></i></div><span class="voice-duration">${seconds}"</span></div><div class="voice-text ${m.expanded ? 'expanded' : ''}">${m.text}</div></div>`;
-
-                            // 【修复】必须设置为false，否则会被外层气泡再次包裹导致样式错乱
-                            useBubble = false;
+                            // 3. 渲染结构
+                            contentHtml = `
+                                <div class="voice-container">
+                                    <div class="voice-bubble ${playingClass}" 
+                                         style="width: ${bubbleWidth}px;" 
+                                         onclick="WeChatUI.toggleVoiceText(${originalIdx}, '${id}', '${m.role}')">
+                                        <div class="voice-icon"><i class="fa-solid fa-wifi rotate-90"></i></div>
+                                        <span class="voice-duration">${seconds}"</span>
+                                    </div>
+                                    <div class="voice-text ${expandedClass}">${m.text}</div>
+                                </div>
+                            `;
                         } else if (m.type === 'system') {
 
                             // 【修改】添加 oncontextmenu 事件，传入 m.id，使其支持右键/长按菜单（删除） 
@@ -13157,6 +13653,9 @@
                             console.log(`[DEBUG] 已绑定 ${boundElements.length} 个消息元素`);
                         }
                     }, 100);
+
+                    // 【主动发消息】启动计时器
+                    WeChatUI.startProactiveChatTimer(id);
 
                 } catch (e) {
                     console.error("加载聊天失败:", e);
@@ -13594,14 +14093,30 @@
                 // 2. 如果正在播放，点击则停止
                 if (msg.playing) {
                     msg.playing = false;
+                    // 停止 TTS
+                    if (window.speechSynthesis) window.speechSynthesis.cancel();
                     AppStorage.set('wechat_chars', chars);
                     WeChatUI.loadChat(cid);
-                    // 注意：这里没有写停止真实Audio的逻辑，简单处理仅停止动画
                     return;
                 }
 
                 // 3. 开始播放（显示动画）
-                msg.playing = true;
+                // 只有 AI 的消息才触发 TTS 朗读，且需要是展开状态
+                if (role === 'ai' && msg.expanded) {
+                    msg.playing = true;
+                    if (typeof SettingsLogic !== 'undefined' && SettingsLogic.generateTTS) {
+                        // 【修复】传入当前角色配置
+                        SettingsLogic.generateTTS(msg.text, chars[cid]);
+                    } else {
+                        console.warn('SettingsLogic.generateTTS not found, skipping TTS');
+                    }
+                } else {
+                    // 用户消息或者折叠状态，只展示动画不朗读（或者不需要动画？）
+                    // 用户需求：用户发送的语音消息不应自动朗读。所以这里不调用 TTS。
+                    // 是否播放动画？暂时保留动画效果，表示正在“阅读”或“播放”
+                    msg.playing = true;
+                }
+
                 AppStorage.set('wechat_chars', chars);
                 WeChatUI.loadChat(cid);
 
@@ -13636,11 +14151,17 @@
                         }
                     }).catch(() => setTimeout(stopPlaying, seconds * 1000));
                 } else {
-                    // 用户发送的消息，或者没开TTS -> 纯模拟动画
+                    // 用户消息或者折叠状态，只展示动画不朗读（或者不需要动画？）
                     setTimeout(stopPlaying, seconds * 1000);
                 }
             },
-            toggleVoiceMode: () => { WeChatUI.isVoiceMode = !WeChatUI.isVoiceMode; document.getElementById('btn-voice-mode').style.color = WeChatUI.isVoiceMode ? '#4ade80' : 'gray'; document.getElementById('chat-input').placeholder = WeChatUI.isVoiceMode ? '输入文字转语音...' : '发送消息...'; },
+            toggleVoiceMode: () => {
+                WeChatUI.isVoiceMode = !WeChatUI.isVoiceMode;
+                const btnVoice = document.getElementById('btn-voice-mode');
+                if (btnVoice) btnVoice.style.color = WeChatUI.isVoiceMode ? '#4ade80' : 'gray';
+                const input = document.getElementById('chat-input');
+                if (input) input.placeholder = WeChatUI.isVoiceMode ? '输入文字转语音...' : '发送消息...';
+            },
             regenerateLastReply: () => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
                 const chars = AppStorage.get('wechat_chars', {});
@@ -13940,23 +14461,9 @@
                     const currentPatSuffix = c.patSuffix || '的头';
 
                     // 使用简单的字符串连接避免模板字符串的语法问题
+                    // 【调整后顺序】系统规则 → 角色设定 → 世界书 → 可用功能
                     let systemPrompt = "==================================================\n";
-                    systemPrompt += "【第一部分：角色设定】\n";
-                    systemPrompt += "==================================================\n";
-                    systemPrompt += "1. YOU ARE \"" + c.name + "\".\n";
-                    systemPrompt += "2. Persona: " + (c.prompt || 'A friendly friend.') + ".\n";
-                    systemPrompt += "3. User: " + (c.userName || 'User') + ".\n";
-                    systemPrompt += "4. Tone: Casual, separate sentences naturally. When encountering brackets (), [], {}, or <>, you must separate the sentence before and after the brackets into different sentences.\n";
-                    systemPrompt += timeContext + latestVoice + "\n\n";
-
-                    systemPrompt += "==================================================\n";
-                    systemPrompt += "【第二部分：世界书】\n";
-                    systemPrompt += "==================================================\n";
-                    systemPrompt += (worldInfo || "暂无关联世界书内容\n\n");
-                    systemPrompt += memoryInfo + "\n";
-
-                    systemPrompt += "==================================================\n";
-                    systemPrompt += "【第三部分：系统规则】\n";
+                    systemPrompt += "【第一部分：系统规则】\n";
                     systemPrompt += "==================================================\n";
                     systemPrompt += "[拍一拍(Nudge)协议]\n";
                     systemPrompt += "1. **当前设定**：你此时的拍一拍风格是：动作=\"**" + currentPatAction + "**\"，后缀=\"**" + currentPatSuffix + "**\"。\n";
@@ -13966,6 +14473,21 @@
                     systemPrompt += "   - 指令格式：在回复的最后单独一行输出 [SET_PAT:动作:后缀]\n";
                     systemPrompt += "   - 例如输出 [SET_PAT:亲了亲:的脸颊]，下次系统提示就会变成 \"用户亲了亲你的脸颊\"。\n";
                     systemPrompt += "3. **主动使用**：如果你想拍用户，请直接输出 [System: 拍一拍]。\n\n";
+
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "【第二部分：角色设定】\n";
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "1. YOU ARE \"" + c.name + "\".\n";
+                    systemPrompt += "2. Persona: " + (c.prompt || 'A friendly friend.') + ".\n";
+                    systemPrompt += "3. User: " + (c.userName || 'User') + ".\n";
+                    systemPrompt += "4. Tone: Casual, separate sentences naturally. When encountering brackets (), [], {}, or <>, you must separate the sentence before and after the brackets into different sentences.\n";
+                    systemPrompt += timeContext + latestVoice + "\n\n";
+
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += "【第三部分：世界书】\n";
+                    systemPrompt += "==================================================\n";
+                    systemPrompt += (worldInfo || "暂无关联世界书内容\n\n");
+                    systemPrompt += memoryInfo + "\n";
 
                     systemPrompt += "==================================================\n";
                     systemPrompt += "【第四部分：可用功能】\n";
@@ -13980,7 +14502,7 @@
                     systemPrompt += "   - 错误示例：给你发个红包[红包: 520 情人节快乐]\n";
                     systemPrompt += "   - 错误示例：这是HTML内容[HTML]<div>测试</div>[/HTML]\n";
                     systemPrompt += "   - 正确示例：你好。###今天天气不错。\n";
-                    systemPrompt += "   - 正确示例：看这张图###https://example.com/image.jpg\n";
+                    systemPrompt += "   - 正确示例：看这张图###https://...\n";
                     systemPrompt += "   - 正确示例：给你发个红包###[红包: 520 情人节快乐]\n";
                     systemPrompt += "   - 正确示例：这是HTML内容###[HTML]<div>测试</div>[/HTML]\n";
                     systemPrompt += "2. **发送图片**：直接输出图片的 URL 链接，或者输出 <img src='URL'> 这样的 HTML 代码，**必须单独作为一个气泡，与其他文本必须使用###分隔**。\n";
@@ -14238,8 +14760,8 @@ Stay in character as "${c.name}" permanently.`;
                             const statusEl = document.getElementById('chat-online-status');
                             if (statusEl) {
                                 statusEl.textContent = '在线';
-                                statusEl.style.color = '#10b981';
-                                statusEl.classList.remove('animate-pulse');
+                                statusEl.style.color = '#10b981'; // 绿色
+                                statusEl.classList.remove('animate-pulse'); // 加个呼吸效果
                             }
                             return;
                         }
@@ -14315,6 +14837,10 @@ Stay in character as "${c.name}" permanently.`;
                         };
 
                         // 步骤 A: 优先按 AI 显式分隔符 ### 切分
+                        // 【核心修复】强制在特殊标签前后插入分句符，防止AI没分句导致语音/图片混在文本里
+                        cleanReply = cleanReply.replace(/(\[HTML\])/gi, "###$1");
+                        cleanReply = cleanReply.replace(/(\[(?:语音|voice|图片|image|表情包)[:：].*?\])/gi, '###$1###');
+
                         let segments = cleanReply.split(/###/);
 
                         segments.forEach(seg => {
@@ -14612,7 +15138,7 @@ Stay in character as "${c.name}" permanently.`;
 
                             // 5. 识别纯图片 (修复：支持识别已经被转为 HTML 格式的图片)
                             const htmlImgMatch = String(msgContent).match(/<img\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/i);
-                            const bracketImgMatch = String(msgContent).match(/^\[\s*(?:图片|image|表情包)[:：]\s*(https?:\/\/[^\]]+)\s*\]$/i);
+                            const bracketImgMatch = String(msgContent).match(/^\[\s*(?:图片|image|表情包)[:：]\s*(https?:\/\/[^\s\]]+)\s*\]$/i);
 
                             // 如果整条消息就是一张图
                             const isPureImage = htmlImgMatch && msgContent.replace(htmlImgMatch[0], '').replace(/\[(?:图片|image|表情包)[:：]\s*\]?/gi, '').trim().length === 0;
@@ -14717,6 +15243,29 @@ Stay in character as "${c.name}" permanently.`;
                 // 推入消息数组 
                 chars[cid].msgs.push(msgObj);
                 WeChatUI.checkAutoSummary(cid);
+
+                // 【新增】当用户发送转账/红包时，注入隐藏的系统提示，引导AI接受或拒绝
+                if (role === 'user' && (msgType === 'redpacket' || msgType === 'transfer')) {
+                    const typeText = msgType === 'redpacket' ? '红包' : '转账';
+                    const amount = content.amount || '0';
+                    const note = content.note || '无备注';
+                    const paymentId = msgObj.paymentId; // 获取刚创建的支付ID
+
+                    // 创建隐藏系统消息
+                    const hiddenSystemMsg = {
+                        id: WeChatUI.generateMsgId(),
+                        role: 'system',
+                        type: 'system',
+                        content: `[系统提示：用户向你发送了${typeText}，金额¥${amount}，备注"${note}"。请在回复中表明态度，并在最后另起一行输出接受或拒绝指令：
+- 接受请输出：[领取${typeText}:${paymentId}]
+- 拒绝请输出：[拒收${typeText}:${paymentId}]
+**重要：必须包含ID ${paymentId}，这些指令不会显示给用户。**]`,
+                        timestamp: Date.now(),
+                        hidden: true // 标记为隐藏消息，渲染时会跳过
+                    };
+
+                    chars[cid].msgs.push(hiddenSystemMsg);
+                }
 
                 // 【核心修复】未读计数和通知逻辑 
                 // 如果当前不在该角色的聊天界面，增加未读数 
@@ -15143,6 +15692,13 @@ Stay in character as "${c.name}" permanently.`;
             },
 
             // --- AI回复处理函数 ---
+            // 【⚠️高危核心区域】AI回复处理器 - 极其脆弱，请勿随意重构！
+            // 此函数包含以下关键逻辑，顺序不可乱：
+            // 1. 指令解析 (CMD:...) - 必须在清理文本之前。
+            // 2. 心声提取 (INNER_VOICE) - 包括防止 JSON 泄漏的清理逻辑。
+            // 3. 智能分句 - 包含对 [图片][语音] 标签的防切分和强制提取逻辑。
+            // 4. 发送队列 - 包含间隔延时。
+            // 修改这里的任何正则或顺序都可能导致：消息发不出来、心声泄漏、语音无法识别。不要乱改！
             handleAIReply: (reply, charId) => {
                 if (!reply) {
                     WeChatUI.pushMessage('error', 'AI 返回了空内容', 'system');
@@ -15175,6 +15731,22 @@ Stay in character as "${c.name}" permanently.`;
                             // 这里复用 generateMoments 的逻辑，或者简化处理
                             Utils.showToast('AI 正在发布动态...');
                             // (可复用上面的生成逻辑)
+                        }
+                        if (act === 'SET_BIO') {
+                            // 格式: [CMD:SET_BIO:新签名]
+                            // p1 即为 新签名
+                            if (p1) {
+                                const cid = document.getElementById('subpage-chat-detail').dataset.charId;
+                                const chars = AppStorage.get('wechat_chars', {});
+                                if (chars[cid]) {
+                                    chars[cid].bio = p1;
+                                    AppStorage.set('wechat_chars', chars);
+                                    // 刷新界面
+                                    const bioEl = document.querySelector(`#subpage-chat-detail .chat-bio`);
+                                    if (bioEl) bioEl.textContent = p1;
+                                    Utils.showToast('对方更新了签名');
+                                }
+                            }
                         }
                     }, 2000);
                 }
@@ -15222,6 +15794,12 @@ Stay in character as "${c.name}" permanently.`;
 
                 // E. 新增：处理残留的心声标记
                 cleanReply = cleanReply.replace(/\[INNER_VOICE\]/gi, '').replace(/\[\/INNER_VOICE\]/gi, '').trim();
+
+                // F. 新增：处理未闭合的心声标签 [INNER_VOICE]内容（没有结束标签）
+                // 匹配 [INNER_VOICE] 后面直到下一个 [ 或结尾的内容
+                cleanReply = cleanReply.replace(/\[INNER_VOICE\][^\[]*(?=\[|$)/gi, '').trim();
+                // 匹配 [INNER_VOICE: 内容] 格式
+                cleanReply = cleanReply.replace(/\[INNER_VOICE[:：][^\]]*\]/gi, '').trim();
 
                 // 删除所有###分隔符
                 cleanReply = cleanReply.replace(/###/g, '').trim();
@@ -15319,6 +15897,7 @@ Stay in character as "${c.name}" permanently.`;
                     // 让后续的消息类型判断逻辑来正确处理，作为独立的image消息发送
 
                     // 只处理空的图片标签，如 [图片：] 或 [图片： (清理无效格式)
+                    // 【关键修复】不再误删 [表情包:名称]
                     msgContent = msgContent.replace(/\[(?:图片|image|表情包)[:：]\s*(?!https?:\/\/)[^\]]*\]?/gi, '');
                     // 处理孤立的 ] 符号
                     msgContent = msgContent.replace(/^\s*\]\s*$/g, '');
@@ -15353,7 +15932,8 @@ Stay in character as "${c.name}" permanently.`;
                             return url;
                         });
                         // 2. 处理空的图片标签，如 [图片：] 或 [图片： 或 [图片：（缺少右括号）
-                        content = content.replace(/\[(?:图片|image|表情包)[:：]\s*(?!\/\/)[^\]]*\]?/gi, '');
+                        // 【关键修复】不再误删 [表情包:名称]
+                        content = content.replace(/\[(?:图片|image)[:：]\s*(?!\/\/)[^\]]*\]?/gi, '');
                         // 3. 处理孤立的 ] 符号
                         // 【修复】强力清除幽灵 "]" (三重保险)
                         if (content.trim() === ']') return true;      // 1. 如果消息只剩一个 "]"，直接拦截不发
@@ -15424,6 +16004,75 @@ Stay in character as "${c.name}" permanently.`;
                             }
                         }
 
+                        // 【新增】检测AI的红包/转账领取/拒收指令（带ID）
+                        const acceptTransferMatch = content.match(/\[领取转账:(\d+)\]/);
+                        const rejectTransferMatch = content.match(/\[拒收转账:(\d+)\]/);
+                        const acceptRedpacketMatch = content.match(/\[领取红包:(\d+)\]/);
+                        const rejectRedpacketMatch = content.match(/\[拒收红包:(\d+)\]/);
+
+                        if (acceptTransferMatch || rejectTransferMatch || acceptRedpacketMatch || rejectRedpacketMatch) {
+                            // 确定操作类型和ID
+                            let paymentType, action, paymentId;
+                            if (acceptTransferMatch) { paymentType = 'transfer'; action = 'received'; paymentId = acceptTransferMatch[1]; }
+                            else if (rejectTransferMatch) { paymentType = 'transfer'; action = 'rejected'; paymentId = rejectTransferMatch[1]; }
+                            else if (acceptRedpacketMatch) { paymentType = 'redpacket'; action = 'received'; paymentId = acceptRedpacketMatch[1]; }
+                            else if (rejectRedpacketMatch) { paymentType = 'redpacket'; action = 'rejected'; paymentId = rejectRedpacketMatch[1]; }
+
+                            // 从消息内容中移除指令（不显示给用户）
+                            content = content.replace(/\[领取转账:\d+\]|\[拒收转账:\d+\]|\[领取红包:\d+\]|\[拒收红包:\d+\]/g, '').trim();
+
+                            // 根据ID查找对应的支付消息
+                            const chars = AppStorage.get('wechat_chars', {});
+                            const char = chars[cid];
+                            if (char && char.msgs) {
+                                // 根据paymentId查找对应的支付消息
+                                const targetPayment = char.msgs.find(m =>
+                                    m.type === paymentType && m.role === 'user' && m.paymentId === parseInt(paymentId)
+                                );
+
+                                if (targetPayment) {
+                                    // 更新支付状态
+                                    targetPayment.status = action;
+
+                                    // 准备系统消息文案
+                                    const typeText = paymentType === 'redpacket' ? '红包' : '转账';
+                                    const amount = parseFloat(targetPayment.amount || '0');
+
+                                    // 【改进】不同的系统提示文案
+                                    let systemMsgContent;
+                                    if (action === 'received') {
+                                        systemMsgContent = '已收款';
+                                    } else {
+                                        systemMsgContent = `对方拒绝了您的${typeText}，余额已退回`;
+                                    }
+
+                                    // 插入系统消息（在当前AI回复之后）
+                                    const systemMsg = {
+                                        id: WeChatUI.generateMsgId(),
+                                        role: 'system',
+                                        type: 'system',
+                                        content: systemMsgContent,
+                                        timestamp: Date.now()
+                                    };
+
+                                    // 暂存，稍后添加到消息列表
+                                    window._pendingPaymentSystemMsg = systemMsg;
+
+                                    // 【改进】处理钱包余额
+                                    if (action === 'received') {
+                                        // 接受：AI收款
+                                        WeChatUI.updateWalletBalance('income', amount, `收到${char.name}的${typeText}`);
+                                    } else {
+                                        // 拒收：退还给用户
+                                        WeChatUI.updateWalletBalance('income', amount, `${typeText}已退还`);
+                                    }
+
+                                    // 保存更改
+                                    AppStorage.set('wechat_chars', chars);
+                                }
+                            }
+                        }
+
                         // 1. 检查是否为指令格式
                         if (content.startsWith('/redpacket')) {
                             const parts = content.split(' ');
@@ -15439,9 +16088,26 @@ Stay in character as "${c.name}" permanently.`;
                             return true;
                         }
 
+                        // 【新增】处理 [语音: 文本] 格式 (兼容中文冒号)
+                        const voiceMatch = String(content).match(/^\[(?:语音|voice)[:：]\s*(.*?)\]$/i);
+                        if (voiceMatch) {
+                            const text = voiceMatch[1].trim();
+                            WeChatUI.pushMessage('voice', text, 'ai');
+                            return true;
+                        }
+
+                        // 【新增】处理 [表情包: 名称] 格式 (兼容中文冒号)
+                        const emojiMatch = String(content).match(/^\[(?:表情包|emoji)[:：]\s*(.*?)\]$/i);
+                        if (emojiMatch) {
+                            // 直接传 [表情包:名称] 给 pushMessage，让 loadChat 去解析 URL
+                            WeChatUI.pushMessage('image', content, 'ai');
+                            return true;
+                        }
+
                         // 2. 识别AI发送的红包格式：[红包: 金额 备注] 
-                        else if (String(content).match(/^\[红包:[^\]]+\]$/)) {
-                            const redPacketMatch = String(content).match(/^\[红包:\s*([^\]]+)\]$/);
+                        // 【修复】兼容中文冒号
+                        else if (String(content).match(/^\[红包[:：][^\]]+\]$/)) {
+                            const redPacketMatch = String(content).match(/^\[红包[:：]\s*([^\]]+)\]$/);
                             if (redPacketMatch) {
                                 const redContent = redPacketMatch[1].trim();
                                 let amount = '0'; // 默认金额
@@ -15644,6 +16310,30 @@ Stay in character as "${c.name}" permanently.`;
 
                         // 9. 默认处理：文本消息
                         WeChatUI.pushMessage('text', content, 'ai');
+
+                        // 【新增】如果有待处理的支付系统消息，立即添加
+                        // 【修复】插入系统消息并刷新卡片状态
+                        if (window._pendingPaymentSystemMsg) {
+                            const chars = AppStorage.get('wechat_chars', {});
+                            const char = chars[cid];
+                            if (char && char.msgs) {
+                                // 找到当前AI回复消息的索引
+                                const aiMsgIndex = char.msgs.findIndex(m => m.id === msg.id);
+
+                                if (aiMsgIndex !== -1) {
+                                    // 在AI消息后面插入系统消息
+                                    char.msgs.splice(aiMsgIndex + 1, 0, window._pendingPaymentSystemMsg);
+                                } else {
+                                    // 如果找不到，就放在最后
+                                    char.msgs.push(window._pendingPaymentSystemMsg);
+                                }
+
+                                AppStorage.set('wechat_chars', chars);
+                                WeChatUI.loadChat(cid); // 刷新界面，更新卡片状态和显示系统消息
+                            }
+                            window._pendingPaymentSystemMsg = null; // 清除标记
+                        }
+
                         return true;
                     }
 
@@ -15972,8 +16662,8 @@ Stay in character as "${c.name}" permanently.`;
                 const closeMenu = (e) => {
                     if (!menu.contains(e.target)) {
                         menu.classList.add('hidden');
-                        menu.style.opacity = '0';
-                        menu.style.display = 'none';
+                        if (menu) menu.style.opacity = '0';
+                        if (menu) menu.style.display = 'none';
                         document.removeEventListener('click', closeMenu);
                         console.log('[showContactMenu] 菜单已关闭!');
                     }
@@ -16044,15 +16734,32 @@ Stay in character as "${c.name}" permanently.`;
             },
 
             closeSubPage: (id) => {
-                // 隐藏当前子页面
-                document.getElementById(id).classList.remove('active');
-
-                // 如果关闭的是聊天页面，停止当前朗读并清空队列
+                // 【查岗计时】如果关闭的是聊天详情页，记录离开时间
                 if (id === 'subpage-chat-detail') {
+                    const chatPage = document.getElementById('subpage-chat-detail');
+                    const charId = chatPage ? chatPage.dataset.charId : null;
+                    if (charId) {
+                        const chars = AppStorage.get('wechat_chars', {});
+                        if (chars[charId]) {
+                            chars[charId].lastLeaveTime = Date.now();
+                            AppStorage.set('wechat_chars', chars);
+                            console.log(`[查岗] ${chars[charId].name} 的聊天界面被关闭，记录离开时间`);
+                        }
+                    }
+                    // 停止当前朗读并清空队列
                     window.speechSynthesis.cancel();
                     WeChatUI.isSpeaking = false;
                     WeChatUI.ttsQueue = [];
+                    // 【主动发消息】停止计时器
+                    if (WeChatUI.proactiveChatTimer) {
+                        clearInterval(WeChatUI.proactiveChatTimer);
+                        WeChatUI.proactiveChatTimer = null;
+                        console.log(`[主动发消息] 计时器已停止（用户离开聊天界面）`);
+                    }
                 }
+
+                // 隐藏当前子页面
+                document.getElementById(id).classList.remove('active');
             },
 
             // 个人信息相关功能
@@ -16283,32 +16990,7 @@ Stay in character as "${c.name}" permanently.`;
                 // 调用AI模型回复
                 const apiMessages = [{ role: 'system', content: char.prompt || '' }, ...char.msgs.filter(m => m.role !== 'system')];
                 SettingsLogic.generateLLM(apiMessages, charId).then(reply => {
-                    if (reply && reply.trim()) {
-                        // 确保AI回复使用###分句
-                        let processedReply = reply.trim();
-                        // 如果回复中没有###，则自动分句
-                        if (!processedReply.includes('###')) {
-                            // 简单分句逻辑：按中文标点分句
-                            processedReply = processedReply
-                                .replace(/([。！？；：])/g, '$1###')
-                                .replace(/(，)/g, '$1')
-                                .trim();
-                            // 如果最后没有###，则添加
-                            if (!processedReply.endsWith('###')) {
-                                processedReply += '###';
-                            }
-                        }
-
-                        const aiMsg = {
-                            role: 'ai',
-                            type: 'text',
-                            content: processedReply,
-                            timestamp: Date.now()
-                        };
-                        char.msgs.push(aiMsg);
-                        AppStorage.set('wechat_chars', chars);
-                        WeChatUI.loadChat(charId, npcId);
-                    }
+                    WeChatUI.handleAIReply(reply, charId);
                 });
             },
 
@@ -16336,32 +17018,7 @@ Stay in character as "${c.name}" permanently.`;
                 // 调用AI模型回复
                 const apiMessages = [{ role: 'system', content: char.prompt || '' }, ...char.msgs.filter(m => m.role !== 'system')];
                 SettingsLogic.generateLLM(apiMessages, charId).then(reply => {
-                    if (reply && reply.trim()) {
-                        // 确保AI回复使用###分句
-                        let processedReply = reply.trim();
-                        // 如果回复中没有###，则自动分句
-                        if (!processedReply.includes('###')) {
-                            // 简单分句逻辑：按中文标点分句
-                            processedReply = processedReply
-                                .replace(/([。！？；：])/g, '$1###')
-                                .replace(/(，)/g, '$1')
-                                .trim();
-                            // 如果最后没有###，则添加
-                            if (!processedReply.endsWith('###')) {
-                                processedReply += '###';
-                            }
-                        }
-
-                        const aiMsg = {
-                            role: 'ai',
-                            type: 'text',
-                            content: processedReply,
-                            timestamp: Date.now()
-                        };
-                        char.msgs.push(aiMsg);
-                        AppStorage.set('wechat_chars', chars);
-                        WeChatUI.loadChat(charId, npcId);
-                    }
+                    WeChatUI.handleAIReply(reply, charId);
                 });
             },
 
@@ -16438,6 +17095,207 @@ Stay in character as "${c.name}" permanently.`;
 
                 // 重置输入框
                 amountInput.value = '100';
+            },
+
+            // 【新增】导出聊天记录
+            exportChatHistory: () => {
+                const cid = WeChatUI.currentChatId;
+                if (!cid) {
+                    Utils.showToast('请先选择一个聊天');
+                    return;
+                }
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+                if (!char || !char.msgs) {
+                    Utils.showToast('暂无聊天记录');
+                    return;
+                }
+
+                // 格式化消息
+                let exportText = `【聊天记录】${char.name}\n`;
+                exportText += `导出时间：${new Date().toLocaleString()}\n`;
+                exportText += `消息数量：${char.msgs.length} 条\n`;
+                exportText += `\n${'='.repeat(50)}\n\n`;
+
+                char.msgs.forEach((m, idx) => {
+                    const time = new Date(m.timestamp || Date.now()).toLocaleString();
+                    const sender = m.role === 'user' ? '我' : char.name;
+
+                    let content = '';
+                    if (m.type === 'text' || !m.type) {
+                        content = m.content;
+                    } else if (m.type === 'image') {
+                        content = '[图片]';
+                    } else if (m.type === 'voice') {
+                        content = `[语音 ${m.duration || 0}秒]`;
+                    } else if (m.type === 'redpacket') {
+                        const status = m.status === 'received' ? '已领取' : (m.status === 'rejected' ? '已退还' : '未领取');
+                        content = `[红包] ${m.note} (${status})`;
+                    } else if (m.type === 'transfer') {
+                        const status = m.status === 'received' ? '已收款' : (m.status === 'rejected' ? '已退还' : '未收款');
+                        content = `[转账] ¥${m.amount} - ${m.note} (${status})`;
+                    } else if (m.type === 'system') {
+                        content = `[系统] ${m.content}`;
+                    } else {
+                        content = `[${m.type}]`;
+                    }
+
+                    exportText += `[${idx + 1}] ${time}\n`;
+                    exportText += `${sender}: ${content}\n\n`;
+                });
+
+                // 下载文件
+                const blob = new Blob([exportText], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `聊天记录-${char.name}-${Date.now()}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                Utils.showToast('导出成功！');
+            },
+
+            // 【新增】打开聊天搜索页面
+            openChatSearch: () => {
+                const cid = WeChatUI.currentChatId;
+                if (!cid) {
+                    Utils.showToast('请先选择一个聊天');
+                    return;
+                }
+
+                // 创建搜索页面（如果不存在）
+                if (!document.getElementById('subpage-chat-search')) {
+                    const searchPage = document.createElement('div');
+                    searchPage.id = 'subpage-chat-search';
+                    searchPage.className = 'sub-view bg-white';
+                    searchPage.innerHTML = `
+                        <div class="app-header justify-between bg-white border-b border-gray-200">
+                            <div class="flex items-center gap-2">
+                                <button onclick="WeChatUI.closeSubPage('subpage-chat-search')" class="w-10 h-full"><i class="fa-solid fa-chevron-left"></i></button>
+                                <span class="font-semibold text-gray-800">查找聊天记录</span>
+                            </div>
+                        </div>
+                        <div class="p-4 bg-gray-50 border-b border-gray-200">
+                            <input type="text" id="chat-search-input" placeholder="搜索消息内容..." 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                                   oninput="WeChatUI.performChatSearch()">
+                        </div>
+                        <div id="chat-search-results" class="overflow-y-auto" style="height: calc(100% - 120px);"></div>
+                    `;
+                    document.getElementById('app-wechat').appendChild(searchPage);
+                }
+
+                // 打开页面
+                WeChatUI.openSubPage('subpage-chat-search');
+
+                // 清空搜索
+                document.getElementById('chat-search-input').value = '';
+                document.getElementById('chat-search-results').innerHTML = '<div class="text-center text-gray-400 py-8">输入关键词开始搜索</div>';
+            },
+
+            // 【新增】执行聊天搜索
+            performChatSearch: () => {
+                const query = document.getElementById('chat-search-input').value.trim();
+                const resultsDiv = document.getElementById('chat-search-results');
+
+                if (!query) {
+                    resultsDiv.innerHTML = '<div class="text-center text-gray-400 py-8">输入关键词开始搜索</div>';
+                    return;
+                }
+
+                const cid = WeChatUI.currentChatId;
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+
+                if (!char || !char.msgs) {
+                    resultsDiv.innerHTML = '<div class="text-center text-gray-400 py-8">暂无聊天记录</div>';
+                    return;
+                }
+
+                // 搜索消息
+                const results = char.msgs.filter((m, idx) => {
+                    if (m.type === 'text' || !m.type) {
+                        return m.content.includes(query);
+                    } else if (m.type === 'redpacket') {
+                        return m.note && m.note.includes(query);
+                    } else if (m.type === 'transfer') {
+                        return (m.note && m.note.includes(query)) || m.amount.toString().includes(query);
+                    }
+                    return false;
+                }).map((m, idx) => ({ ...m, originalIndex: char.msgs.indexOf(m) }));
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="text-center text-gray-400 py-8">未找到匹配结果</div>';
+                    return;
+                }
+
+                // 渲染结果
+                resultsDiv.innerHTML = results.map(m => {
+                    const time = new Date(m.timestamp || Date.now()).toLocaleString();
+                    const sender = m.role === 'user' ? '我' : char.name;
+                    let content = '';
+
+                    if (m.type === 'text' || !m.type) {
+                        content = m.content.substring(0, 100);
+                    } else if (m.type === 'redpacket') {
+                        content = `[红包] ${m.note}`;
+                    } else if (m.type === 'transfer') {
+                        content = `[转账] ¥${m.amount} - ${m.note}`;
+                    }
+
+                    // 高亮显示搜索词
+                    content = content.replace(new RegExp(query, 'g'), `<span class="bg-yellow-200">${query}</span>`);
+
+                    return `
+                        <div class="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer" 
+                             onclick="WeChatUI.jumpToMessage(${m.originalIndex})">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-medium text-sm text-gray-800">${sender}</span>
+                                <span class="text-xs text-gray-400">${time}</span>
+                            </div>
+                            <div class="text-sm text-gray-600">${content}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                resultsDiv.innerHTML += `<div class="text-center text-gray-400 py-4 text-xs">共找到 ${results.length} 条结果</div>`;
+            },
+
+            // 【新增】跳转到指定消息
+            jumpToMessage: (msgIndex) => {
+                // 关闭搜索页面
+                WeChatUI.closeSubPage('subpage-chat-search');
+
+                // 确保消息被加载
+                const cid = WeChatUI.currentChatId;
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+
+                if (char && char.msgs) {
+                    // 确保要跳转的消息被加载
+                    WeChatUI.currentLoadedMsgs[cid] = Math.max(WeChatUI.currentLoadedMsgs[cid] || 50, msgIndex + 10);
+
+                    // 重新加载聊天
+                    WeChatUI.loadChat(cid);
+
+                    // 等待渲染完成后滚动并高亮
+                    setTimeout(() => {
+                        const container = document.getElementById('chat-messages-container');
+                        const msgElements = container.querySelectorAll('.msg-row');
+
+                        if (msgElements[msgIndex]) {
+                            msgElements[msgIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            msgElements[msgIndex].style.background = '#fef9c3';
+
+                            setTimeout(() => {
+                                msgElements[msgIndex].style.transition = 'background 1s';
+                                msgElements[msgIndex].style.background = '';
+                            }, 1000);
+                        }
+                    }, 300);
+                }
             },
 
 
@@ -18759,33 +19617,57 @@ Stay in character as "${c.name}" permanently.`;
         window.SystemLog = {
             logs: [],
             currentFilter: 'all',
+            currentTab: 'logs',
+            autoScroll: true, // 默认开启
 
             // 核心记录函数
+            open: () => {
+                const appEl = document.getElementById('app-syslogs');
+                if (appEl) {
+                    appEl.style.display = 'flex';
+                    // 如果日志为空，写入一条欢迎信息
+                    if (SystemLog.logs.length === 0) {
+                        SystemLog.write('SYS', '系统监视器就绪', '等待应用事件...');
+                    }
+                    // 重置状态
+                    SystemLog.switchTab(SystemLog.currentTab || 'logs');
+                    SystemLog.render();
+                    if (SystemLog.autoScroll) SystemLog.scrollToBottom();
+                }
+            },
+
             write: (type, title, detail = null) => {
                 const entry = {
                     id: Date.now() + Math.random(),
                     time: new Date().toLocaleTimeString(),
-                    type: type, // 'INFO', 'AI', 'ERR', 'SYS'
+                    type: type,
                     title: title,
                     detail: detail
                 };
-                SystemLog.logs.unshift(entry); // 最新的在最前
+                SystemLog.logs.push(entry); // 改为push，新日志在底部
 
-                // 限制日志数量防止卡顿
-                if (SystemLog.logs.length > 200) SystemLog.logs.pop();
-
-                // 如果当前打开了日志APP，实时渲染
-                if (document.getElementById('app-syslog').classList.contains('active')) {
-                    SystemLog.render();
-                }
+                // 限制日志数量
+                if (SystemLog.logs.length > 500) SystemLog.logs.shift();
 
                 // 同时也打印到浏览器控制台
                 console.log(`[${type}] ${title}`, detail || '');
+
+                // 实时渲染
+                const appEl = document.getElementById('app-syslogs');
+                if (appEl && appEl.style.display !== 'none') {
+                    if (SystemLog.currentTab === 'logs') {
+                        SystemLog.renderLogs();
+                    }
+                    // 上下文只在相关时更新
+                    if (title.includes('网络请求') && SystemLog.currentTab === 'context') {
+                        SystemLog.renderContext();
+                    }
+                }
             },
 
-            clear: () => {
+            clearLogs: () => {
                 SystemLog.logs = [];
-                SystemLog.render();
+                SystemLog.renderLogs();
                 window.Utils.showToast('日志已清空');
             },
 
@@ -18798,41 +19680,113 @@ Stay in character as "${c.name}" permanently.`;
                 SystemLog.render();
             },
 
-            render: () => {
-                const container = document.getElementById('syslog-container');
-                if (!container) return;
+            export: () => {
+                const blob = new Blob([JSON.stringify(SystemLog.logs, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `system_logs_${Date.now()}.json`;
+                a.click();
+            },
 
-                let filtered = SystemLog.logs;
-                if (SystemLog.currentFilter !== 'all') {
-                    filtered = filtered.filter(l => typeof l.type === 'string' && l.type.includes(SystemLog.currentFilter));
+            toggleAutoScroll: () => {
+                SystemLog.autoScroll = !SystemLog.autoScroll;
+                const btn = document.getElementById('auto-scroll-btn');
+                if (btn) {
+                    btn.textContent = `自动滚动: ${SystemLog.autoScroll ? 'ON' : 'OFF'}`;
+                    btn.style.background = SystemLog.autoScroll ? '#0e639c' : '#3c3c3c';
                 }
+                if (SystemLog.autoScroll) SystemLog.scrollToBottom();
+            },
+
+            scrollToBottom: () => {
+                const container = document.getElementById('logs-container');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            },
+
+            switchTab: (tabName) => {
+                SystemLog.currentTab = tabName;
+                document.querySelectorAll('.app-window .flex button[id^="tab-btn-"]').forEach(btn => {
+                    if (btn.id === `tab-btn-${tabName}`) {
+                        btn.className = "flex-1 py-3 text-sm font-bold text-blue-400 border-b-2 border-blue-400 hover:bg-white/5 transition-colors";
+                    } else {
+                        btn.className = "flex-1 py-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:bg-white/5 transition-colors";
+                    }
+                });
+                const panelLogs = document.getElementById('panel-logs');
+                const panelContext = document.getElementById('panel-context');
+                if (panelLogs) panelLogs.style.display = tabName === 'logs' ? 'flex' : 'none';
+                if (panelContext) panelContext.style.display = tabName === 'context' ? 'flex' : 'none';
+
+                SystemLog.render();
+                if (tabName === 'logs' && SystemLog.autoScroll) SystemLog.scrollToBottom();
+            },
+
+            renderContext: () => {
+                const container = document.getElementById('context-container');
+                if (!container) return;
+                // 倒序查找最近请求
+                const lastReq = [...SystemLog.logs].reverse().find(l => l.type === 'AI' && l.title.includes('网络请求'));
+                if (!lastReq || !lastReq.detail) {
+                    container.innerHTML = '<div class="text-center text-gray-500 mt-20">暂无上下文数据<br>请先与AI进行一次对话</div>';
+                    return;
+                }
+                try {
+                    const payload = (typeof lastReq.detail === 'string') ? JSON.parse(lastReq.detail) : lastReq.detail;
+                    const messages = payload.messages || [];
+                    const params = { model: payload.model, temperature: payload.temperature, max_tokens: payload.max_tokens };
+                    let html = `<div class="mb-4 p-2 bg-black/20 rounded border border-gray-700"><div class="text-gray-400 font-bold mb-1 border-b border-gray-600 pb-1">Request Parameters</div><div class="text-green-400 text-[10px] mt-1 whitespace-pre-wrap">${JSON.stringify(params, null, 2)}</div></div>`;
+                    messages.forEach((msg, idx) => {
+                        let roleColor = 'text-gray-300', roleBg = 'bg-gray-800/50', roleIcon = 'fa-user';
+                        if (msg.role === 'system') { roleColor = 'text-red-300'; roleBg = 'bg-red-900/10 border-red-900/30'; roleIcon = 'fa-gear'; }
+                        else if (msg.role === 'user') { roleColor = 'text-green-300'; roleBg = 'bg-green-900/10 border-green-900/30'; roleIcon = 'fa-user'; }
+                        else if (msg.role === 'assistant') { roleColor = 'text-blue-300'; roleBg = 'bg-blue-900/10 border-blue-900/30'; roleIcon = 'fa-robot'; }
+                        let content = typeof msg.content === 'string' ? msg.content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : JSON.stringify(msg.content, null, 2);
+                        html += `<div class="mb-4 p-3 rounded border border-gray-700 ${roleBg}"><div class="font-bold mb-2 ${roleColor} uppercase flex justify-between items-center text-[10px]"><span><i class="fa-solid ${roleIcon} mr-1"></i> [${idx}] ${msg.role}</span><span class="opacity-50 font-mono">Len: ${msg.content.length}</span></div><div class="whitespace-pre-wrap leading-relaxed opacity-90 break-words">${content}</div></div>`;
+                    });
+                    container.innerHTML = html;
+                } catch (e) { container.innerHTML = `<div class="text-red-400">解析上下文失败: ${e.message}</div>`; }
+            },
+
+            renderLogs: () => {
+                const container = document.getElementById('logs-container');
+                if (!container) return;
+                let filtered = SystemLog.logs;
+                const typeFilter = document.getElementById('log-level-filter').value;
+                const keyword = document.getElementById('log-keyword-filter').value.toLowerCase();
+
+                if (typeFilter) filtered = filtered.filter(l => l.type && l.type.toLowerCase().includes(typeFilter.toLowerCase()));
+                if (keyword) filtered = filtered.filter(l => (l.title && l.title.toLowerCase().includes(keyword)) || (l.detail && typeof l.detail === 'string' && l.detail.toLowerCase().includes(keyword)));
 
                 container.innerHTML = filtered.map(log => {
                     let colorClass = 'text-gray-400';
                     if (log.type === 'AI') colorClass = 'text-blue-400';
                     if (log.type === 'ERR') colorClass = 'text-red-400';
                     if (log.type === 'SYS') colorClass = 'text-green-400';
-
-                    // 处理详情数据的显示
                     let detailHtml = '';
                     if (log.detail) {
                         let detailStr = typeof log.detail === 'object' ? JSON.stringify(log.detail, null, 2) : log.detail;
-                        detailHtml = `<details class="mt-1"><summary class="cursor-pointer opacity-50 hover:opacity-100">[查看详情]</summary><pre class="bg-black/30 p-2 rounded mt-1 overflow-x-auto whitespace-pre-wrap text-[10px] text-gray-500">${detailStr.replace(/</g, '&lt;')}</pre></details>`;
+                        detailStr = detailStr.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+                        detailHtml = `<details class="mt-1"><summary class="cursor-pointer opacity-50 hover:opacity-100 select-none">[查看详情 / Raw Data]</summary><pre class="bg-black/30 p-2 rounded mt-1 overflow-x-auto whitespace-pre-wrap text-[10px] text-gray-500 select-text">${detailStr}</pre></details>`;
                     }
-
-                    return `
-                <div class="border-b border-gray-800 pb-2">
-                    <div class="flex gap-2">
-                        <span class="opacity-50 font-mono">[${log.time}]</span>
-                        <span class="font-bold ${colorClass}">[${log.type}]</span>
-                        <span class="text-gray-200">${log.title}</span>
-                    </div>
-                    ${detailHtml}
-                </div>
-            `;
+                    return `<div class="border-b border-gray-800 pb-2 mb-2"><div class="flex gap-2 items-center"><span class="opacity-50 font-mono text-[10px] w-16">${log.time}</span><span class="font-bold ${colorClass} w-10 text-center text-[10px] border border-gray-700 rounded">${log.type}</span><span class="text-gray-200 flex-1 font-bold text-sm truncate" title="${log.title}">${log.title}</span></div>${detailHtml}</div>`;
                 }).join('');
+
+                if (SystemLog.autoScroll) SystemLog.scrollToBottom();
+            },
+
+            render: () => {
+                if (!SystemLog.currentTab) SystemLog.currentTab = 'logs';
+                if (SystemLog.currentTab === 'logs') SystemLog.renderLogs();
+                else SystemLog.renderContext();
             }
         };
+
+        // 兼容旧的引用名称
+        window.SystemLoggerUI = window.SystemLog;
+        window.SystemLogger = window.SystemLog;
 
         // 修复气泡预览头像不显示的问题
         WeChatUI.updateBgPreview = function () {
@@ -19015,46 +19969,76 @@ Stay in character as "${c.name}" permanently.`;
     </div>
 
     <!-- 系统日志应用 -->
-    <div id="app-syslogs" class="app-window" style="background: #1e1e1e;">
-        <div class="app-header" style="background: #252526; border-bottom: 1px solid #3e3e42;">
+    <div id="app-syslogs" class="app-window flex flex-col" style="background: #1e1e1e;">
+        <div class="app-header flex-shrink-0" style="background: #252526; border-bottom: 1px solid #3e3e42;">
             <button onclick="closeApp()"
                 class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 text-white">
                 <i class="fa-solid fa-chevron-left"></i>
             </button>
-            <div class="font-bold text-lg text-white">系统日志</div>
+            <div class="font-bold text-lg text-white">系统控制台</div>
             <div class="flex gap-2">
                 <button onclick="SystemLoggerUI.export()"
-                    class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" title="导出">
+                    class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" title="导出日志">
                     <i class="fa-solid fa-download"></i>
                 </button>
                 <button onclick="SystemLoggerUI.clearLogs()"
-                    class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700" title="清空">
+                    class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700" title="清空日志">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
         </div>
 
-        <!-- 过滤栏 -->
-        <div
-            style="background: #2d2d30; padding: 8px; border-bottom: 1px solid #3e3e42; display: flex; gap: 8px; align-items: center;">
-            <select id="log-level-filter" onchange="SystemLoggerUI.render()"
-                style="background: #3c3c3c; color: #ccc; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
-                <option value="">全部级别</option>
-                <option value="error">Error</option>
-                <option value="warn">Warning</option>
-                <option value="info">Info</option>
-            </select>
-            <input type="text" id="log-keyword-filter" placeholder="搜索..." oninput="SystemLoggerUI.render()"
-                style="background: #3c3c3c; color: #ccc; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px; flex: 1;">
-            <button onclick="SystemLoggerUI.toggleAutoScroll()" id="auto-scroll-btn"
-                style="background: #0e639c; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">
-                自动滚动: ON
+        <!-- Tab 导航栏 -->
+        <div class="flex border-b border-gray-700 bg-[#2d2d30]">
+            <button onclick="SystemLoggerUI.switchTab('logs')" id="tab-btn-logs"
+                class="flex-1 py-3 text-sm font-bold text-blue-400 border-b-2 border-blue-400 hover:bg-white/5 transition-colors">
+                <i class="fa-solid fa-terminal mr-2"></i>系统日志
+            </button>
+            <button onclick="SystemLoggerUI.switchTab('context')" id="tab-btn-context"
+                class="flex-1 py-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:bg-white/5 transition-colors">
+                <i class="fa-solid fa-code mr-2"></i>即时上下文
             </button>
         </div>
 
-        <!-- 日志容器 -->
-        <div id="logs-container"
-            style="height: calc(100% - 120px); overflow-y: scroll; padding: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; color: #ccc;">
+        <!-- Tab 1: 日志列表面板 -->
+        <div id="panel-logs" class="flex-1 flex flex-col min-h-0">
+            <!-- 过滤栏 -->
+            <div class="flex-shrink-0"
+                style="background: #2d2d30; padding: 8px; border-bottom: 1px solid #3e3e42; display: flex; gap: 8px; align-items: center;">
+                <select id="log-level-filter" onchange="SystemLoggerUI.render()"
+                    style="background: #3c3c3c; color: #ccc; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                    <option value="">全部级别</option>
+                    <option value="error">Error</option>
+                    <option value="warn">Warning</option>
+                    <option value="info">Info</option>
+                </select>
+                <input type="text" id="log-keyword-filter" placeholder="搜索日志..." oninput="SystemLoggerUI.render()"
+                    style="background: #3c3c3c; color: #ccc; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px; flex: 1;">
+                <button onclick="SystemLoggerUI.toggleAutoScroll()" id="auto-scroll-btn"
+                    style="background: #0e639c; color: white; border: none; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                    自动滚动: OFF
+                </button>
+            </div>
+
+            <!-- 日志容器 -->
+            <div id="logs-container" class="flex-1 overflow-y-auto p-2 font-mono text-xs text-gray-300 custom-scrollbar"
+                style="scroll-behavior: smooth;">
+            </div>
+        </div>
+
+        <!-- Tab 2: 上下文查看面板 -->
+        <div id="panel-context" class="flex-1 flex flex-col min-h-0 hidden">
+            <div class="p-2 border-b border-gray-700 bg-[#2d2d30] flex justify-between items-center flex-shrink-0">
+                <span class="text-xs text-gray-400">显示最近一次发送给AI的完整上下文</span>
+                <button onclick="SystemLoggerUI.renderContext()"
+                    class="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                    <i class="fa-solid fa-arrows-rotate mr-1"></i>刷新
+                </button>
+            </div>
+            <div id="context-container"
+                class="flex-1 overflow-y-auto p-4 text-gray-300 font-mono text-xs select-text whitespace-pre-wrap">
+                <div class="text-center text-gray-500 mt-20">暂无上下文数据<br>请先与AI进行一次对话</div>
+            </div>
         </div>
     </div>
 
@@ -19085,8 +20069,8 @@ Stay in character as "${c.name}" permanently.`;
             console.log('[AntiGravity] Initialization Complete.');
         });
     </script>
-        <script>
-        (function() {
+    <script>
+        (function () {
             // 1. 定义应用配置信息 (Manifest)
             const pwaManifest = {
                 "name": "乔乔小手机 OS",
@@ -19107,7 +20091,7 @@ Stay in character as "${c.name}" permanently.`;
 
             // 2. 将配置转换为浏览器可识别的 Data URI
             const stringManifest = JSON.stringify(pwaManifest);
-            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const blob = new Blob([stringManifest], { type: 'application/json' });
             const manifestURL = URL.createObjectURL(blob);
 
             // 3. 注入到页面的占位符中
@@ -19127,9 +20111,84 @@ Stay in character as "${c.name}" permanently.`;
                 window.deferredPrompt = e;
                 console.log('[PWA] 可以安装到桌面了');
             });
+            // Start Proactive Timer
+            setTimeout(() => {
+                if (typeof WeChatUI !== 'undefined' && WeChatUI.startProactiveTimer) {
+                    WeChatUI.startProactiveTimer();
+                }
+            }, 5000);
+        });
+
+        /* 【新增】Token 统计与日志劫持模块 */
+        (function () {
+            // 简单的 Token 估算工具 (1汉字=2token, 1英文字=1token, 粗略计算)
+            function estimateTokens(text) {
+                if (!text || typeof text !== 'string') return 0;
+                let len = 0;
+                for (let i = 0; i < text.length; i++) {
+                    const code = text.charCodeAt(i);
+                    // 汉字范围粗略判断
+                    if (code > 0x4E00 && code < 0x9FFF) len += 2;
+                    else len += 1;
+                }
+                // OpenAI tokenizer 通常大概是 char_count / 3.5 到 4
+                // 这里为了保险起见，用字符数即可，或者简单除以 1.5 接近中文真实 token
+                return Math.floor(len);
+            }
+
+            window.addEventListener('load', () => {
+                // 确保 SettingsLogic 已加载
+                if (typeof SettingsLogic !== 'undefined' && SettingsLogic.generateLLM) {
+                    console.log('[SystemLog] Hooking SettingsLogic.generateLLM for Token usage tracking...');
+
+                    const originalGenerateLLM = SettingsLogic.generateLLM;
+
+                    SettingsLogic.generateLLM = async function (msgs, charId) {
+                        const start = Date.now();
+
+                        // 1. 计算 Input Token (估算)
+                        let inputStr = '';
+                        try {
+                            if (Array.isArray(msgs)) inputStr = msgs.map(m => m.content).join('\n');
+                            else inputStr = String(msgs);
+                        } catch (e) { }
+                        const inputTokens = estimateTokens(inputStr);
+
+                        try {
+                            // 2. 执行原始请求
+                            const result = await originalGenerateLLM.apply(this, arguments);
+
+                            // 3. 计算 Output Token
+                            const outputTokens = estimateTokens(result);
+
+                            // 4. 记录日志
+                            const logMsg = `[Token Usage] Input: ${inputTokens}, Output: ${outputTokens}`;
+
+                            // 兼容不同的 SystemLog实现
+                            if (window.SystemLog) {
+                                if (typeof SystemLog.add === 'function') {
+                                    SystemLog.add('info', [logMsg]);
+                                } else if (typeof SystemLog.write === 'function') {
+                                    SystemLog.write('INFO', 'Token Usage', { input: inputTokens, output: outputTokens, total: inputTokens + outputTokens });
+                                } else {
+                                    console.log(logMsg);
+                                }
+                            } else {
+                                console.log('[SystemLog Missing]', logMsg);
+                            }
+
+                            return result;
+                        } catch (e) {
+                            console.error('LLM Generation Failed (Hook):', e);
+                            throw e;
+                        }
+                    };
+                } else {
+                    console.warn('[SystemLog] SettingsLogic.generateLLM not found, Token logging inactive.');
+                }
+            });
         })();
     </script>
-
 </body>
 
 
