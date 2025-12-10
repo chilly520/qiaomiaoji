@@ -6889,256 +6889,246 @@
                 }
             },
 
- generateLLM: async (messages, cid, useSecondary = false) => {
-    // 【修复 1】直接从 Storage 读取当前选中的配置 ID
-    let targetConfigId = AppStorage.get('wechat_current_api', 'default');
-    
-    // 获取所有配置对象
-    const allConfigs = AppStorage.get('wechat_api_configs', {});
-    let config = allConfigs[targetConfigId];
-
-    // 【修复 2】处理副 API 逻辑 (如果有)
-    if (useSecondary) {
-        const secConfig = AppStorage.get('wechat_secondary_api', null);
-        // 只有当副配置存在且有 URL 时才使用，否则回退到主配置
-        if (secConfig && secConfig.url) {
-            config = secConfig;
-            console.log('Using Secondary API for Generation');
+    generateLLM: async (messages, cid, useSecondary = false) => {
+        // 【1. 读取配置】直接从本地存储读取，不再依赖内存变量，解决配置“失效”问题
+        const currentId = AppStorage.get('wechat_current_api', 'default');
+        const allConfigs = AppStorage.get('wechat_api_configs', {});
+        
+        // 尝试获取配置
+        let config = allConfigs[currentId];
+        
+        // 处理副API逻辑
+        if (useSecondary) {
+            const secConfig = AppStorage.get('wechat_secondary_api', null);
+            if (secConfig && secConfig.url) {
+                config = secConfig;
+                console.log('[SettingsLogic] 使用副API生成内容');
+            }
         }
-    }
 
-    // 【修复 3】配置有效性检查
-    // 有些旧数据可能没有 key，或者 config 本身就是 undefined
-    if (!config || !config.url) {
-        // 尝试自动修复：如果没有找到 targetConfigId，试着读取 default
-        if (allConfigs['default']) {
+        // 容错：如果找不到配置，尝试读取 default
+        if (!config || !config.url) {
+            console.warn('[SettingsLogic] 指定配置无效，尝试回退到默认配置');
             config = allConfigs['default'];
-            console.warn('Config not found, falling back to default');
-        } else {
-            throw new Error("API配置无效：未找到配置信息，请在设置中重新保存配置");
         }
-    }
-    
-    if (!config.key) throw new Error("API Key 未配置");
 
-    const chars = AppStorage.get('wechat_chars', {});
-    const char = chars[cid];
-
-    // --- 世界书与记忆注入 ---
-    const books = AppStorage.get('wechat_worldbooks', {});
-    let worldInfo = "";
-    if (char && char.worldbookEntries) {
-        char.worldbookEntries.forEach(entryId => {
-            const [bookId, entryIdx] = entryId.split('_');
-            const book = books[bookId];
-            if (book && book.entries && book.entries[parseInt(entryIdx)]) {
-                const entry = book.entries[parseInt(entryIdx)];
-                if (entry.enabled && entry.content) worldInfo += `[World Info: ${entry.content}]\n`;
-            }
-        });
-    }
-    let memoryInfo = "";
-    if (char && char.memory && char.memory.length > 0) {
-        // 【修改】不再限制条数，全部注入！
-        memoryInfo += "\n[System Note - Historical Memory (Fact)]:\n";
-        char.memory.forEach(m => {
-            if (m.type === 'summary') {
-                const dateStr = new Date(m.timestamp).toLocaleString();
-                memoryInfo += `- [${dateStr}] ${m.content}\n`;
-            }
-        });
-        memoryInfo += "[End of History]\n";
-    }
-
-    // --- 表情包库注入 ---
-    let emojiInfo = "";
-    const globalEmojis = AppStorage.get('wechat_global_emojis', []);
-    const charEmojis = char ? (char.emojis || []) : [];
-    const allEmojis = [...globalEmojis, ...charEmojis];
-    if (allEmojis.length > 0) {
-        emojiInfo += "\n[System Note - Available Emojis (Fact)]:\n";
-        allEmojis.forEach((emoji, index) => {
-            const emojiName = emoji.name || `表情${index + 1}`;
-            emojiInfo += `- ${emoji.url} (名称: ${emojiName}) - ${emoji.type === 'global' ? '全局表情包' : '专属表情包'}\n`;
-        });
-        emojiInfo += "[End of Available Emojis]\n";
-        emojiInfo += "[重要提示]：你必须直接使用上述URL，禁止使用[表情包:名称]格式！\n";
-    }
-
-    // --- 朋友圈信息注入 --- 
-    let momentsInfo = "";
-    momentsInfo += "\n[朋友圈指南]\n";
-    momentsInfo += "1. 感知：你可以通过系统提示读取朋友圈(Moments)。\n";
-    momentsInfo += "2. ID：每条动态有唯一ID，互动时必须引用。\n";
-    momentsInfo += "3. 互动指令：\n";
-    momentsInfo += "   - 点赞：[CMD:LIKE:ID]\n";
-    momentsInfo += "   - 评论：[CMD:COMMENT:ID:内容]\n";
-    momentsInfo += "   - 发帖：[CMD:MOMENT_POST:内容:配图提示词]\n";
-    momentsInfo += "   - 改签名：[SET_BIO:新签名]\n";
-
-    const allMoments = AppStorage.get('wechat_moments', []);
-    const recent = allMoments.slice(0, 5); 
-    let envInfo = "";
-    if (recent.length > 0) {
-        envInfo = "\n[环境感知 - 朋友圈动态]:\n" + recent.map((m, i) => {
-            const author = (m.authorType === 'user') ? '我(User)' : '好友';
-            return `${i + 1}. [ID:${m.id}] ${author}: "${m.content.substring(0, 30)}..."`;
-        }).join('\n');
-        momentsInfo += envInfo;
-    }
-
-    // 2. 准备API地址
-    let endpoint = config.url.replace(/\/$/, '');
-    if (!endpoint.endsWith('/chat/completions')) {
-        if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
-        else endpoint += '/v1/chat/completions';
-    }
-
-    // 3. 获取链接记忆上下文
-    const linkedMemoryContext = await WeChatUI.getLinkedMemoryContext(cid);
-
-    // 处理 System Prompt
-    if (messages && messages.length > 0 && messages[0].role === 'system') {
-        messages[0].content = worldInfo + memoryInfo + emojiInfo + momentsInfo + linkedMemoryContext + messages[0].content;
-    }
-
-    // 3. 【核心】构建历史记录 & 智能省流
-    const historyLimit = char ? (char.contextLimit || 20) : 20;
-    const historyMsgs = char && char.msgs ? char.msgs.slice(-historyLimit) : [];
-
-    // 找出包含真实数据的图片索引
-    const imageIndices = historyMsgs.map((m, i) => (m.type === 'image' && m.originalContent) ? i : -1).filter(i => i !== -1);
-    const activeImageIndices = imageIndices.slice(-1);
-
-    const apiMessages = messages && messages.length > 0 ? [messages[0]] : [];
-
-    historyMsgs.forEach((m, index) => {
-        let contentPayload;
-
-        if (m.type === 'image') {
-            if (m.originalContent && activeImageIndices.includes(index)) {
-                contentPayload = [
-                    { type: "text", text: m.content.includes(':') ? m.content : "这是用户发送的图片" },
-                    { type: "image_url", image_url: { url: m.originalContent, detail: "low" } }
-                ];
-            } else {
-                const imageUrl = m.originalContent || (m.content.includes(':') ? m.content.split(':')[1].trim() : m.content);
-                contentPayload = `[图片: ${imageUrl}]`;
-            }
+        // 最终检查
+        if (!config || !config.url || !config.key) {
+            window.Utils.showToast('API配置无效，请前往设置检查API连接');
+            throw new Error("API配置无效");
         }
-        else if (m.type === 'moment_share') {
-            let shareData = m.content;
-            if (typeof shareData === 'string') {
-                try { shareData = JSON.parse(shareData); } catch (e) { shareData = { text: shareData }; }
-            }
-            contentPayload = '[系统提示: 用户分享了一条朋友圈链接。作者：' + (shareData.author || '好友') + ', 内容："' + shareData.text + '"。请对此进行互动评论。]';
+
+        const chars = AppStorage.get('wechat_chars', {});
+        const char = chars[cid];
+
+        // 【2. 上下文注入】(世界书、记忆、表情包)
+        const books = AppStorage.get('wechat_worldbooks', {});
+        let worldInfo = "";
+        if (char && char.worldbookEntries) {
+            char.worldbookEntries.forEach(entryId => {
+                const [bookId, entryIdx] = entryId.split('_');
+                const book = books[bookId];
+                if (book && book.entries && book.entries[parseInt(entryIdx)]) {
+                    const entry = book.entries[parseInt(entryIdx)];
+                    if (entry.enabled && entry.content) worldInfo += `[World Info: ${entry.content}]\n`;
+                }
+            });
         }
-        else if (m.type === 'moment_card') {
-            const card = JSON.parse(m.content);
-            contentPayload = `[系统提示：用户转发了一条朋友圈。
-- 作者：${card.author}
-- 内容："${card.text}"
-- 配图：${card.image ? '有' : '无'}
+
+        let memoryInfo = "";
+        if (char && char.memory && char.memory.length > 0) {
+            memoryInfo += "\n[System Note - Historical Memory (Fact)]:\n";
+            char.memory.forEach(m => {
+                if (m.type === 'summary') {
+                    const dateStr = new Date(m.timestamp).toLocaleString();
+                    memoryInfo += `- [${dateStr}] ${m.content}\n`;
+                }
+            });
+            memoryInfo += "[End of History]\n";
+        }
+
+        let emojiInfo = "";
+        const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+        const charEmojis = char ? (char.emojis || []) : [];
+        const allEmojis = [...globalEmojis, ...charEmojis];
+        if (allEmojis.length > 0) {
+            emojiInfo += "\n[System Note - Available Emojis (Fact)]:\n";
+            allEmojis.forEach((emoji, index) => {
+                const emojiName = emoji.name || `表情${index + 1}`;
+                emojiInfo += `- ${emoji.url} (名称: ${emojiName}) - ${emoji.type === 'global' ? '全局表情包' : '专属表情包'}\n`;
+            });
+            emojiInfo += "[End of Available Emojis]\n";
+            emojiInfo += "[重要提示]：你必须直接使用上述URL，禁止使用[表情包:名称]格式！\n";
+        }
+
+        let momentsInfo = "";
+        momentsInfo += "\n[朋友圈指南]\n";
+        momentsInfo += "1. 感知：你可以通过系统提示读取朋友圈(Moments)。\n";
+        momentsInfo += "2. ID：每条动态有唯一ID，互动时必须引用。\n";
+        momentsInfo += "3. 互动指令：\n";
+        momentsInfo += "   - 点赞：[CMD:LIKE:ID]\n";
+        momentsInfo += "   - 评论：[CMD:COMMENT:ID:内容]\n";
+        momentsInfo += "   - 发帖：[CMD:MOMENT_POST:内容:配图提示词]\n";
+        momentsInfo += "   - 改签名：[SET_BIO:新签名]\n";
+
+        const allMoments = AppStorage.get('wechat_moments', []);
+        const recent = allMoments.slice(0, 5);
+        let envInfo = "";
+        if (recent.length > 0) {
+            envInfo = "\n[环境感知 - 朋友圈动态]:\n" + recent.map((m, i) => {
+                const author = (m.authorType === 'user') ? '我(User)' : '好友';
+                return `${i + 1}. [ID:${m.id}] ${author}: "${m.content.substring(0, 30)}..."`;
+            }).join('\n');
+            momentsInfo += envInfo;
+        }
+
+        // 【3. 准备API地址】
+        let endpoint = config.url.replace(/\/$/, '');
+        if (!endpoint.endsWith('/chat/completions')) {
+            if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
+            else endpoint += '/v1/chat/completions';
+        }
+
+        // 获取链接记忆上下文
+        const linkedMemoryContext = await WeChatUI.getLinkedMemoryContext(cid);
+
+        // 处理 System Prompt
+        if (messages && messages.length > 0 && messages[0].role === 'system') {
+            messages[0].content = worldInfo + memoryInfo + emojiInfo + momentsInfo + linkedMemoryContext + messages[0].content;
+        }
+
+        // 【4. 构建历史记录】
+        const historyLimit = char ? (char.contextLimit || 20) : 20;
+        const historyMsgs = char && char.msgs ? char.msgs.slice(-historyLimit) : [];
+
+        // 找出包含真实数据的图片索引（只保留最后一张图以节省Token）
+        const imageIndices = historyMsgs.map((m, i) => (m.type === 'image' && m.originalContent) ? i : -1).filter(i => i !== -1);
+        const activeImageIndices = imageIndices.slice(-1);
+
+        const apiMessages = messages && messages.length > 0 ? [messages[0]] : [];
+
+        historyMsgs.forEach((m, index) => {
+            let contentPayload;
+
+            if (m.type === 'image') {
+                if (m.originalContent && activeImageIndices.includes(index)) {
+                    contentPayload = [
+                        { type: "text", text: m.content.includes(':') ? m.content : "这是用户发送的图片" },
+                        { type: "image_url", image_url: { url: m.originalContent, detail: "low" } }
+                    ];
+                } else {
+                    const imageUrl = m.originalContent || (m.content.includes(':') ? m.content.split(':')[1].trim() : m.content);
+                    contentPayload = `[图片: ${imageUrl}]`;
+                }
+            } else if (m.type === 'moment_share') {
+                let shareData = m.content;
+                if (typeof shareData === 'string') {
+                    try { shareData = JSON.parse(shareData); } catch (e) { shareData = { text: shareData }; }
+                }
+                contentPayload = '[系统提示: 用户分享了一条朋友圈链接。作者：' + (shareData.author || '好友') + ', 内容："' + shareData.text + '"。请对此进行互动评论。]';
+            } else if (m.type === 'moment_card') {
+                let card = {};
+                try { card = JSON.parse(m.content); } catch (e) {}
+                contentPayload = `[系统提示：用户转发了一条朋友圈。
+- 作者：${card.author || '未知'}
+- 内容："${card.text || ''}"
 - 朋友圈ID：${card.id}
-
 如果你想互动，请在回复最后另起一行输出指令：
 - 点赞：[CMD:LIKE:${card.id}]
 - 评论：[CMD:COMMENT:${card.id}:你的评论内容]
 ]`;
-        }
-        else {
-            let textContent = m.content;
-            if (m.type === 'transfer') textContent = `[转账: ${m.amount}元]`;
-            if (m.type === 'redpacket') textContent = `[红包: ${m.note}]`;
-            if (m.type === 'voice') textContent = `[语音: "${m.text}"]`;
-            contentPayload = textContent;
-        }
+            } else {
+                let textContent = m.content;
+                if (m.type === 'transfer') textContent = `[转账: ${m.amount}元]`;
+                if (m.type === 'redpacket') textContent = `[红包: ${m.note}]`;
+                if (m.type === 'voice') textContent = `[语音: "${m.text}"]`;
+                contentPayload = textContent;
+            }
 
-        if (contentPayload) {
-            apiMessages.push({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: contentPayload
-            });
-        }
-    });
-
-    // 检查本轮对话中是否有用户发送的红包或转账
-    const userMsgs = historyMsgs.filter(msg => msg.role === 'user');
-    const hasPaymentMsg = userMsgs.some(msg => msg.type === 'transfer' || msg.type === 'redpacket');
-
-    if (hasPaymentMsg) {
-        const pendingPayments = userMsgs.filter(msg => (msg.type === 'transfer' || msg.type === 'redpacket') && (!msg.status || msg.status === 'pending'));
-        if (pendingPayments.length > 0) {
-            const latestPayment = pendingPayments.reduce((latest, current) => {
-                return (latest.timestamp || 0) > (current.timestamp || 0) ? latest : current;
-            });
-
-            if (latestPayment) {
-                const amount = latestPayment.amount || '0.00';
-                const note = latestPayment.note || '';
-                const paymentType = latestPayment.type === 'transfer' ? '转账' : '红包';
-
+            if (contentPayload) {
                 apiMessages.push({
-                    role: 'system',
-                    content: `{{user}}给你发了${paymentType}，金额：${amount}元${note ? '，备注：' + note : ''}，请立即选择领取或拒绝，再生成对话内容。请按格式输出：
-领取格式：[领取${paymentType}]
-拒绝格式：[拒绝${paymentType}]`
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: contentPayload
                 });
             }
-        }
-    }
-
-    // 4. 发送请求
-    const payload = {
-        model: config.model,
-        messages: apiMessages,
-        temperature: parseFloat(config.temp) || 0.9,
-        max_tokens: parseInt(config.maxTokens) || 4096, // 注意这里修正为 maxTokens
-        safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-        ]
-    };
-
-    // 决定使用哪个队列 (主队列或生成专用队列)
-    const targetQueue = (useSecondary && window.GenQueue) ? window.GenQueue : window.APIQueue;
-
-    if (window.SystemLog) {
-        SystemLog.write('AI', '加入请求队列', { model: config.model, queueLength: targetQueue.queue.length });
-    }
-
-    return targetQueue.enqueue(async () => {
-        if (window.SystemLog) SystemLog.write('AI', '开始执行请求', payload);
-        const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            mode: 'cors',
-            credentials: 'omit'
         });
-        if (!res.ok) {
-            let errorMsg = 'HTTP ' + res.status;
-            try {
-                const errorData = await res.json();
-                if (errorData.error) errorMsg += ': ' + errorData.error.message;
-            } catch (e) { errorMsg += ': ' + await res.text(); }
 
-            if (window.SystemLog) SystemLog.write('ERR', 'API 请求失败', errorMsg);
-            throw new Error(errorMsg);
+        // 检查未领取的红包/转账
+        const userMsgs = historyMsgs.filter(msg => msg.role === 'user');
+        const hasPaymentMsg = userMsgs.some(msg => msg.type === 'transfer' || msg.type === 'redpacket');
+
+        if (hasPaymentMsg) {
+            const pendingPayments = userMsgs.filter(msg => (msg.type === 'transfer' || msg.type === 'redpacket') && (!msg.status || msg.status === 'pending'));
+            if (pendingPayments.length > 0) {
+                const latestPayment = pendingPayments.reduce((latest, current) => {
+                    return (latest.timestamp || 0) > (current.timestamp || 0) ? latest : current;
+                });
+
+                if (latestPayment) {
+                    const amount = latestPayment.amount || '0.00';
+                    const note = latestPayment.note || '';
+                    const paymentType = latestPayment.type === 'transfer' ? '转账' : '红包';
+
+                    apiMessages.push({
+                        role: 'system',
+                        content: `{{user}}给你发了${paymentType}，金额：${amount}元${note ? '，备注：' + note : ''}，请立即选择领取或拒绝。`
+                    });
+                }
+            }
         }
 
-        const data = await res.json();
-        if (window.SystemLog) SystemLog.write('AI', '收到原始回复', data);
-        
-        if (!data.choices || data.choices.length === 0) {
-            throw new Error(`API返回内容为空`);
-        }
-        return data.choices[0].message.content;
-    });
-}
+        // 【5. 发送请求】
+        const payload = {
+            model: config.model,
+            messages: apiMessages,
+            temperature: parseFloat(config.temp) || 0.9,
+            // 修复键名不一致问题：config中保存的是 maxTokens，API参数需要 max_tokens
+            max_tokens: parseInt(config.maxTokens || config.max_tokens) || 4096,
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+            ]
+        };
 
+        // 决定使用哪个队列
+        const targetQueue = (useSecondary && window.GenQueue) ? window.GenQueue : window.APIQueue;
+
+        if (window.SystemLog) {
+            SystemLog.write('AI', 'API请求入队', { model: config.model, queueLength: targetQueue.queue.length });
+        }
+
+        return targetQueue.enqueue(async () => {
+            if (window.SystemLog) SystemLog.write('AI', '发起网络请求', payload);
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                mode: 'cors',
+                credentials: 'omit'
+            });
+            if (!res.ok) {
+                let errorMsg = 'HTTP ' + res.status;
+                try {
+                    const errorData = await res.json();
+                    if (errorData.error) errorMsg += ': ' + errorData.error.message;
+                } catch (e) { errorMsg += ': ' + await res.text(); }
+
+                if (window.SystemLog) SystemLog.write('ERR', 'API 请求失败', errorMsg);
+                throw new Error(errorMsg);
+            }
+
+            const data = await res.json();
+            if (window.SystemLog) SystemLog.write('AI', '收到回复', data);
+            
+            if (!data.choices || data.choices.length === 0) {
+                throw new Error(`API返回内容为空`);
+            }
+            return data.choices[0].message.content;
+        });
+    },
+    
             // --- 情感分析器：给本地语音加点“料” ---
             analyzeEmotion: (text) => {
                 let speed = 1.0; // 默认语速
@@ -18127,11 +18117,8 @@ Stay in character as "${c.name}" permanently.`;
                 if (!container) return;
 
                 // 1. 检查 API 配置
-                // 修正键名，与 SettingsUI 中保存的键名一致
-const apiConfigs = AppStorage.get('wechat_api_configs', {}); // 注意这里是对象，不是数组
-const currentApiId = AppStorage.get('wechat_current_api', 'default');
-const apiConfig = apiConfigs[currentApiId] || {};
-
+                const apiConfigs = AppStorage.get('api_configs', []);
+                const currentApiId = AppStorage.get('current_api_id', 'default');
                 const apiConfig = apiConfigs.find(c => c.id === currentApiId) || {};
 
                 if (!apiConfig.key || !apiConfig.url) {
@@ -19098,6 +19085,51 @@ const apiConfig = apiConfigs[currentApiId] || {};
             console.log('[AntiGravity] Initialization Complete.');
         });
     </script>
+        <script>
+        (function() {
+            // 1. 定义应用配置信息 (Manifest)
+            const pwaManifest = {
+                "name": "乔乔小手机 OS",
+                "short_name": "乔乔手机",
+                "start_url": ".",
+                "display": "standalone",
+                "background_color": "#1e1b4b",
+                "theme_color": "#1e1b4b",
+                "orientation": "portrait-primary",
+                "icons": [
+                    {
+                        "src": "https://img.icons8.com/color/512/iphone-x.png", // 使用了一个通用的手机图标
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            };
+
+            // 2. 将配置转换为浏览器可识别的 Data URI
+            const stringManifest = JSON.stringify(pwaManifest);
+            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+
+            // 3. 注入到页面的占位符中
+            const linkTag = document.getElementById('manifest-placeholder');
+            if (linkTag) {
+                linkTag.setAttribute('href', manifestURL);
+                console.log('[PWA] Manifest 注入成功，应用已具备安装能力');
+            } else {
+                console.warn('[PWA] 未找到 manifest-placeholder 标签');
+            }
+
+            // 4. 监听安装事件 (可选：用于后续开发安装按钮)
+            window.addEventListener('beforeinstallprompt', (e) => {
+                // 阻止 Chrome 67 及更早版本自动显示安装提示
+                e.preventDefault();
+                // 保存事件以便稍后触发
+                window.deferredPrompt = e;
+                console.log('[PWA] 可以安装到桌面了');
+            });
+        })();
+    </script>
+
 </body>
 
 
