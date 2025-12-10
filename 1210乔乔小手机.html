@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -7,7 +7,8 @@
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>乔乔小手机 OS</title>
 
-    <meta http-equiv="Content-Security-Policy" content="connect-src * data: blob: 'unsafe-inline'; default-src * data: blob: 'unsafe-inline' 'unsafe-eval';">
+    <meta http-equiv="Content-Security-Policy"
+        content="connect-src * data: blob: 'unsafe-inline'; default-src * data: blob: 'unsafe-inline' 'unsafe-eval';">
     <meta name="referrer" content="no-referrer">
 
     <!-- PWA Settings -->
@@ -803,13 +804,13 @@
             transition: opacity 0.2s, filter 0.2s, transform 0.1s, box-shadow 0.1s;
             position: relative;
         }
-        
+
         /* 添加点击反馈效果 */
         .pay-card:not(.received):not(.rejected):active {
             transform: scale(0.98);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
-        
+
         /* 添加悬停效果 */
         .pay-card:not(.received):not(.rejected):hover {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -1057,6 +1058,15 @@
             perspective: 1000px !important;
         }
 
+        /* 红包头像修复 */
+        #rp-open-avatar img,
+        #rp-user-avatar img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            object-position: center !important;
+        }
+
         .html-isolated-container .diary-book {
             width: 100% !important;
             height: 200px !important;
@@ -1192,6 +1202,19 @@
             transition: all 0.2s ease;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             /* 加一点点微阴影增加质感 */
+        }
+
+        /* 为语音气泡添加背景颜色 */
+        .msg-row.self .voice-bubble {
+            background: radial-gradient(circle at top right, #374151 0%, #1f2937 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e5e7eb;
+        }
+
+        .msg-row.other .voice-bubble {
+            background: radial-gradient(circle at top left, #2a2520 0%, #0e0e10 100%);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            color: #e6dcc0;
         }
 
         /* 补充：让图标也变小一点 */
@@ -3197,7 +3220,8 @@
                         <span id="secondary-max-tokens-display" class="text-purple-600">4096</span>
                     </div>
                     <div class="glass-panel p-4 rounded-2xl mb-6">
-                        <input type="range" id="secondary-api-max-tokens" min="256" max="3000000" step="1000" value="4096"
+                        <input type="range" id="secondary-api-max-tokens" min="256" max="3000000" step="1000"
+                            value="4096"
                             class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-purple-500"
                             oninput="document.getElementById('secondary-max-tokens-display').textContent=this.value">
                     </div>
@@ -5200,78 +5224,87 @@
         };
 
         // 立即初始化日志系统
-        SystemLogger.init();
+        //         SystemLogger.init();
 
         // 4. 系统日志UI管理器
+        window.AppStorage = {
+            get: (k, d) => { try { return JSON.parse(localStorage.getItem(k) || JSON.stringify(d)); } catch (e) { return d; } },
+            set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { if (e.name === 'QuotaExceededError') alert('空间已满'); } }
+        };
+
         window.SystemLoggerUI = {
             autoScroll: true,
+            expandedLogs: new Set(), // 记录哪些日志是展开状态的
 
-            // 渲染日志
+            // 渲染日志 (Fixed)
             render: function () {
                 const container = document.getElementById('logs-container');
                 if (!container) return;
 
                 const levelFilter = document.getElementById('log-level-filter')?.value;
-                const keywordFilter = document.getElementById('log-keyword-filter')?.value.toLowerCase();
+                const keywordFilter = document.getElementById('log-keyword-filter')?.value ? document.getElementById('log-keyword-filter').value.toLowerCase() : '';
 
-                const filtered = SystemLogger.filter({
-                    level: levelFilter || undefined,
-                    keyword: keywordFilter || undefined
-                });
+                try {
+                    const filtered = SystemLogger.filter({
+                        level: levelFilter || undefined,
+                        keyword: keywordFilter || undefined
+                    });
 
-                if (filtered.length === 0) {
-                    container.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">暂无日志</div>';
-                    return;
-                }
+                    if (filtered.length === 0) {
+                        container.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">暂无日志</div>';
+                        return;
+                    }
 
-                container.innerHTML = filtered.map((log, idx) => {
-                    const time = new Date(log.timestamp).toLocaleTimeString();
-                    const date = new Date(log.timestamp).toLocaleDateString();
-                    const levelColors = {
-                        error: '#f48771',
-                        warn: '#dcdcaa',
-                        info: '#4fc1ff'
-                    };
-                    const color = levelColors[log.level] || '#ccc';
-                    const level = log.level.toUpperCase().padEnd(7, ' ');
+                    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
 
-                    const messagePreview = log.messages[0] || '';
-                    const hasMore = log.messages.length > 1 || log.stack;
+                    container.innerHTML = filtered.map((log) => {
+                        const time = new Date(log.timestamp).toLocaleTimeString();
+                        const date = new Date(log.timestamp).toLocaleDateString();
+                        const levelColors = { error: '#f48771', warn: '#dcdcaa', info: '#4fc1ff' };
+                        const color = levelColors[log.level] || '#ccc';
+                        const level = log.level.toUpperCase().padEnd(7, ' ');
+                        const messagePreview = (log.messages[0] || '').toString();
+                        const hasMore = log.messages.length > 1 || log.stack || messagePreview.length > 100;
+                        const logId = log.id || (log.timestamp + Math.random());
+                        const isExpanded = this.expandedLogs.has(logId);
 
-                    return `
-                        <div style="padding: 4px 0; border-bottom: 1px solid #2d2d30; cursor: ${hasMore ? 'pointer' : 'default'};" 
-                             ${hasMore ? `onclick="SystemLoggerUI.toggleDetails(${idx}, this)"` : ''}>
-                            <div style="display: flex; align-items: flex-start; gap: 8px;">
-                                <span style="color: #666; font-size: 10px; white-space: nowrap;">${time}</span>
-                                <span style="color: ${color}; font-weight: bold; white-space: nowrap;">[${level}]</span>
-                                <span style="color: #ccc; flex: 1; word-break: break-word;">${this.escapeHtml(messagePreview)}</span>
-                                ${hasMore ? '<span style="color: #666; font-size: 10px;">▼</span>' : ''}
-                            </div>
-                            ${hasMore ? `
-                            <div class="log-details" style="display: none; margin-top: 8px; padding-left: 80px; color: #999; font-size: 11px; background: #1a1a1a; padding: 8px; border-radius: 4px; margin-right: 8px;">
-                                <div style="margin-bottom: 8px;">
-                                    <span style="color: #666;">完整时间:</span> <span style="color: #aaa;">${date} ${time}</span>
+                        return `
+                            <div data-log-id="${logId}" style="padding: 4px 0; border-bottom: 1px solid #2d2d30; cursor: ${hasMore ? 'pointer' : 'default'};"
+                                 ${hasMore ? 'onclick="SystemLoggerUI.toggleDetails(\'' + logId + '\', this)"' : ''}>
+                                <div style="display: flex; align-items: flex-start; gap: 8px;">
+                                    <span style="color: #666; font-size: 10px; white-space: nowrap;">${time}</span>
+                                    <span style="color: ${color}; font-weight: bold; white-space: nowrap;">[${level}]</span>
+                                    <span style="color: #ccc; flex: 1; word-break: break-all;">${this.escapeHtml(messagePreview)}</span>
+                                    ${hasMore ? `<span style="color: #666; font-size: 10px;">${isExpanded ? '' : ''}</span>` : ''}
                                 </div>
-                                ${log.messages.length > 1 ? `
+                                ${hasMore ? `
+                                <div class="log-details" style="display: ${isExpanded ? 'block' : 'none'}; margin-top: 8px; padding-left: 8px; color: #999; font-size: 11px; background: #1a1a1a; padding: 8px; border-radius: 4px; margin-right: 8px;">
                                     <div style="margin-bottom: 8px;">
-                                        <div style="color: #666; margin-bottom: 4px;">完整消息:</div>
-                                        <pre style="color: #ccc; margin: 0; white-space: pre-wrap; word-break: break-word;">${log.messages.map(m => this.escapeHtml(m)).join('\n')}</pre>
+                                        <span style="color: #666;">Time:</span> <span style="color: #aaa;">${date} ${time}</span>
                                     </div>
-                                ` : ''}
-                                ${log.stack ? `
-                                    <div>
-                                        <div style="color: #666; margin-bottom: 4px;">调用堆栈:</div>
-                                        <pre style="color: #888; margin: 0; font-size: 10px; white-space: pre-wrap; line-height: 1.4;">${this.escapeHtml(log.stack)}</pre>
-                                    </div>
+                                    ${log.messages.length > 0 ? `
+                                        <div style="margin-bottom: 8px;">
+                                            <div style="color: #666; margin-bottom: 4px;">Message:</div>
+                                            <pre style="color: #ccc; margin: 0; white-space: pre-wrap; word-break: break-all;">${log.messages.map(m => this.escapeHtml(m)).join('\n')}</pre>
+                                        </div>
+                                    ` : ''}
+                                    ${log.stack ? `
+                                        <div>
+                                            <div style="color: #666; margin-bottom: 4px;">Stack:</div>
+                                            <pre style="color: #888; margin: 0; font-size: 10px; white-space: pre-wrap; line-height: 1.4;">${this.escapeHtml(log.stack)}</pre>
+                                        </div>
+                                    ` : ''}
+                                </div>
                                 ` : ''}
                             </div>
-                            ` : ''}
-                        </div>
-                    `;
-                }).join('');
+                        `;
+                    }).join('');
 
-                if (this.autoScroll) {
-                    container.scrollTop = container.scrollHeight;
+                    if (this.autoScroll && isAtBottom) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                } catch (e) {
+                    console.error('Render error:', e);
                 }
             },
 
@@ -5283,13 +5316,22 @@
             },
 
             // 切换详细信息
-            toggleDetails: function (index, element) {
+            toggleDetails: function (logId, element) {
                 const details = element.querySelector('.log-details');
                 const arrow = element.querySelector('span:last-child');
                 if (details) {
                     const isHidden = details.style.display === 'none';
-                    details.style.display = isHidden ? 'block' : 'none';
-                    if (arrow) arrow.textContent = isHidden ? '▲' : '▼';
+
+                    // 更新展开状态
+                    if (isHidden) {
+                        this.expandedLogs.add(logId);
+                        details.style.display = 'block';
+                        if (arrow) arrow.textContent = '▲';
+                    } else {
+                        this.expandedLogs.delete(logId);
+                        details.style.display = 'none';
+                        if (arrow) arrow.textContent = '▼';
+                    }
                 }
             },
 
@@ -5381,7 +5423,7 @@
 
             compressImage: (file, maxWidth = 512, quality = null) => {
                 // 如果没有传入质量参数，使用用户设置的压缩质量，默认0.7
-                const userQuality = quality !== null ? quality : Storage.get('image_compress_quality', 0.7);
+                const userQuality = quality !== null ? quality : AppStorage.get('image_compress_quality', 0.7);
 
                 return new Promise((resolve, reject) => {
                     // 检查是否是GIF图片
@@ -5616,7 +5658,7 @@
             }
         };
 
-        // --- 🎵 全能乐队引擎 (Tone.js) ---
+        // --- ⚙️ 设置逻辑 (Settings Logic) ---
         window.MusicBox = {
             synth: null, isPlaying: false,
             // 乐器预设
@@ -5750,6 +5792,11 @@
         // 初始化电量显示
         updateBatteryLevel();
 
+        // 初始化API配置（加载默认配置和用户保存的配置）
+        if (window.SettingsLogic) {
+            //             window.SettingsLogic.initAPI();
+        }
+
         // Navigation
         // 确保变量只被声明一次
         if (typeof window.swiper === 'undefined') {
@@ -5760,7 +5807,7 @@
         window.isDragging = false;
 
         // 提前声明HistoryManager，避免使用时未定义错误
-        window.HistoryManager = window.HistoryManager || {
+        window.HistoryManager = {
             push: (id) => {
                 history.pushState({ level: 'subview', id: id }, '', '');
             },
@@ -5916,15 +5963,11 @@
 
 
 
-        window.Storage = {
-            get: (k, d) => { try { return JSON.parse(localStorage.getItem(k) || JSON.stringify(d)); } catch (e) { return d; } },
-            set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { if (e.name === 'QuotaExceededError') alert('空间已满'); } }
-        };
 
         // Weather Logic
         window.WeatherLogic = {
             init: () => {
-                const config = Storage.get('weather_config', { virtualLoc: '虚拟城市', realLoc: '' });
+                const config = AppStorage.get('weather_config', { virtualLoc: '虚拟城市', realLoc: '' });
                 document.getElementById('weather-virtual-loc').value = config.virtualLoc;
                 document.getElementById('weather-real-loc').value = config.realLoc;
                 WeatherLogic.updateDisplay(config);
@@ -5934,7 +5977,7 @@
                     virtualLoc: document.getElementById('weather-virtual-loc').value || '虚拟城市',
                     realLoc: document.getElementById('weather-real-loc').value
                 };
-                Storage.set('weather_config', config);
+                AppStorage.set('weather_config', config);
                 WeatherLogic.updateDisplay(config);
                 if (config.realLoc) WeatherLogic.fetchRealWeather(config.realLoc);
                 Utils.showToast('天气设置已保存');
@@ -5967,191 +6010,224 @@
 
         window.SettingsLogic = {
             configs: [], currentId: null,
-            initAPI: () => {
-                SettingsLogic.configs = Storage.get('api_configs', [{ id: 'default', name: '默认配置', url: '', key: '', model: '', temp: 0.7 }]);
-                SettingsLogic.currentId = Storage.get('current_api_id', 'default');
-                // 新增：读取副API设置
-                SettingsLogic.secondaryId = Storage.get('secondary_api_id', '');
-
-                const renderOptions = (selectedId) => SettingsLogic.configs.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.name}</option>`).join('');
-
-                // 渲染主API下拉框
-                document.getElementById('api-config-select').innerHTML = renderOptions(SettingsLogic.currentId);
-                // 渲染副API下拉框
-                const secondarySelect = document.getElementById('secondary-api-select');
-                secondarySelect.innerHTML = '<option value="">跟随主配置 (默认)</option>' + renderOptions(SettingsLogic.secondaryId);
-
-                // 添加副API选择变化事件监听器
-                secondarySelect.onchange = function () {
-                    const selectedId = this.value;
-                    if (selectedId) {
-                        SettingsLogic.loadAPIConfig(selectedId, 'secondary');
-                    }
-                };
-
-                SettingsLogic.loadAPIConfig(SettingsLogic.currentId, 'primary');
-
-                // 如果有副API配置，加载其配置
-                if (SettingsLogic.secondaryId) {
-                    SettingsLogic.loadAPIConfig(SettingsLogic.secondaryId, 'secondary');
-                }
+            // 默认API配置
+            DEFAULT_CONFIG: {
+                name: '默认配置',
+                url: 'http://127.0.0.1:7861/v1',
+                key: 'pwd',
+                model: 'gemini-2.5-pro-nothinking',
+                temp: 0.7,
+                maxTokens: 4096
             },
-            loadAPIConfig: (id, type = 'primary') => {
-                // 如果是主API，更新主配置ID
-                if (type === 'primary') {
-                    SettingsLogic.currentId = id;
-                    Storage.set('current_api_id', id);
-                } else {
-                    SettingsLogic.secondaryId = id;
-                    Storage.set('secondary_api_id', id);
+
+            // 初始化API配置
+            initAPI: function () {
+                let configs = AppStorage.get('wechat_api_configs', {});
+
+                // 如果没有任何配置，创建默认配置
+                if (Object.keys(configs).length === 0) {
+                    configs['default'] = this.DEFAULT_CONFIG;
+                    AppStorage.set('wechat_api_configs', configs);
+                    AppStorage.set('wechat_current_api', 'default');
+                    console.log('[SettingsLogic] 创建默认API配置');
                 }
 
-                // 获取对应配置
-                const config = SettingsLogic.configs.find(c => c.id === id);
-                if (!config) return;
+                this.loadAPIList();
 
-                // 根据类型更新对应的输入框
-                const prefix = type === 'primary' ? 'primary-api-' : 'secondary-api-';
-                document.getElementById(`${prefix}name`).value = config.name;
-                document.getElementById(`${prefix}url`).value = config.url;
-                document.getElementById(`${prefix}key`).value = config.key;
-                document.getElementById(`${prefix}model`).value = config.model;
-                document.getElementById(`${prefix}temp`).value = config.temp;
-                document.getElementById(`${prefix}max-tokens`).value = config.max_tokens || 4096;
-                document.getElementById(`${type}-temp-display`).textContent = config.temp;
-                document.getElementById(`${type}-max-tokens-display`).textContent = config.max_tokens || 4096;
-            },
-            saveAPI: () => {
-                // 保存主配置
-                const primaryConfig = {
-                    id: SettingsLogic.currentId,
-                    name: document.getElementById('primary-api-name').value,
-                    url: document.getElementById('primary-api-url').value,
-                    key: document.getElementById('primary-api-key').value,
-                    model: document.getElementById('primary-api-model').value,
-                    temp: document.getElementById('primary-api-temp').value,
-                    max_tokens: parseInt(document.getElementById('primary-api-max-tokens').value)
-                };
-                const primaryIdx = SettingsLogic.configs.findIndex(c => c.id === SettingsLogic.currentId);
-                if (primaryIdx !== -1) SettingsLogic.configs[primaryIdx] = primaryConfig;
+                const currentKey = AppStorage.get('wechat_current_api', 'default');
+                this.loadAPIConfig(currentKey, 'primary');
 
-                // 保存副配置（如果有选择的话）
-                const secondaryId = document.getElementById('secondary-api-select').value;
-                if (secondaryId) {
-                    const secondaryConfig = {
-                        id: secondaryId,
-                        name: document.getElementById('secondary-api-name').value,
-                        url: document.getElementById('secondary-api-url').value,
-                        key: document.getElementById('secondary-api-key').value,
-                        model: document.getElementById('secondary-api-model').value,
-                        temp: document.getElementById('secondary-api-temp').value,
-                        max_tokens: parseInt(document.getElementById('secondary-api-max-tokens').value)
+                const secondaryConfig = AppStorage.get('wechat_secondary_api', null);
+                if (secondaryConfig) {
+                    this.loadSecondaryAPIConfig(secondaryConfig);
+                }
+                // Add listener
+                const secSel = document.getElementById('secondary-api-select');
+                if (secSel) {
+                    secSel.onchange = function () {
+                        if (this.value) SettingsLogic.loadAPIConfig(this.value, 'secondary');
                     };
-                    const secondaryIdx = SettingsLogic.configs.findIndex(c => c.id === secondaryId);
-                    if (secondaryIdx !== -1) SettingsLogic.configs[secondaryIdx] = secondaryConfig;
+                    // Auto-fill logic: if secondaryConfig is null, try to fill with default?
+                    // Or just let user select.
+                    // User said: "Default config didn't fill".
+                    // If we add this listener, they can select "default" from list.
+                }
+            },
+
+            // 加载API配置列表到下拉菜单
+            loadAPIList: function () {
+                const configs = AppStorage.get('wechat_api_configs', {});
+                const primarySelect = document.getElementById('api-config-select');
+                const secondarySelect = document.getElementById('secondary-api-select');
+
+                if (primarySelect) {
+                    primarySelect.innerHTML = Object.keys(configs).map(key => {
+                        const config = configs[key];
+                        return `<option value="${key}">${config.name || key}</option>`;
+                    }).join('');
+                    primarySelect.value = AppStorage.get('wechat_current_api', 'default');
                 }
 
-                // 保存配置列表
-                Storage.set('api_configs', SettingsLogic.configs);
-
-                // 保存副API选择
-                Storage.set('secondary_api_id', secondaryId);
-                SettingsLogic.secondaryId = secondaryId;
-
-                window.Utils.showToast('配置已保存 (含副API)');
+                if (secondarySelect) {
+                    secondarySelect.innerHTML = '<option value="">跟随主配置 (默认)</option>' +
+                        Object.keys(configs).map(key => {
+                            const config = configs[key];
+                            return `<option value="${key}">${config.name || key}</option>`;
+                        }).join('');
+                }
             },
-            createNewAPI: () => { const newId = 'config_' + Date.now(); SettingsLogic.configs.push({ id: newId, name: '新配置', url: '', key: '', model: '', temp: 0.7 }); SettingsLogic.initAPI(); document.getElementById('api-config-select').value = newId; SettingsLogic.loadAPIConfig(newId, 'primary'); },
-            deleteAPI: () => { if (SettingsLogic.configs.length <= 1) return alert('无法删除'); if (!confirm('删除?')) return; SettingsLogic.configs = SettingsLogic.configs.filter(c => c.id !== SettingsLogic.currentId); SettingsLogic.currentId = SettingsLogic.configs[0].id; Storage.set('api_configs', SettingsLogic.configs); SettingsLogic.initAPI(); },
-            fetchModels: async (type = 'primary') => {
-                // 根据类型获取对应的输入框和选择器
-                const prefix = type === 'primary' ? 'primary-api-' : 'secondary-api-';
-                const urlInput = document.getElementById(`${prefix}url`);
-                const keyInput = document.getElementById(`${prefix}key`);
-                const btn = document.querySelector(`[onclick*="SettingsLogic.fetchModels('${type}')"]`);
 
-                if (!urlInput.value || !keyInput.value) return window.Utils.showToast('请填写完整的接口地址和密钥');
+            loadAPIConfig: function (configKey, type) {
+                if (!configKey || configKey === '') return;
 
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<div class="spinner-container"><i class="fa-solid fa-spinner spinner-rotate"></i></div>';
-                btn.disabled = true;
+                const configs = AppStorage.get('wechat_api_configs', {});
+                const config = configs[configKey];
+                if (!config) return console.error('[SettingsLogic] 配置不存在:', configKey);
+
+                const prefix = type === 'primary' ? 'primary' : 'secondary';
+                const setVal = (id, val) => { const el = document.getElementById(prefix + '-api-' + id); if (el) el.value = val || ''; };
+
+                setVal('name', config.name);
+                setVal('url', config.url);
+                setVal('key', config.key);
+                setVal('model', config.model);
+                setVal('temp', config.temp);
+                setVal('max-tokens', config.maxTokens || 4096);
+
+                if (document.getElementById(prefix + '-temp-display')) document.getElementById(prefix + '-temp-display').textContent = config.temp || 0.7;
+                if (document.getElementById(prefix + '-max-tokens-display')) document.getElementById(prefix + '-max-tokens-display').textContent = config.maxTokens || 4096;
+
+                if (type === 'primary') AppStorage.set('wechat_current_api', configKey);
+            },
+
+            loadSecondaryAPIConfig: function (config) {
+                const prefix = 'secondary';
+                const setVal = (id, val) => { const el = document.getElementById(prefix + '-api-' + id); if (el) el.value = val || ''; };
+                setVal('name', config.name);
+                setVal('url', config.url);
+                setVal('key', config.key);
+                setVal('model', config.model);
+                setVal('temp', config.temp);
+                setVal('max-tokens', config.maxTokens || 4096);
+            },
+
+            saveAPI: function () {
+                const currentConfigKey = AppStorage.get('wechat_current_api', 'default');
+                const getVal = (id) => document.getElementById('primary-api-' + id).value;
+
+                const primaryConfig = {
+                    name: getVal('name') || '未命名配置',
+                    url: getVal('url'),
+                    key: getVal('key'),
+                    model: getVal('model'),
+                    temp: parseFloat(getVal('temp')) || 0.7,
+                    maxTokens: parseInt(getVal('max-tokens')) || 4096
+                };
+
+                let configs = AppStorage.get('wechat_api_configs', {});
+                configs[currentConfigKey] = primaryConfig;
+                AppStorage.set('wechat_api_configs', configs);
+
+                const getSecVal = (id) => document.getElementById('secondary-api-' + id).value;
+                const secondaryConfig = {
+                    name: getSecVal('name'),
+                    url: getSecVal('url'),
+                    key: getSecVal('key'),
+                    model: getSecVal('model'),
+                    temp: parseFloat(getSecVal('temp')) || 0.7,
+                    maxTokens: parseInt(getSecVal('max-tokens')) || 4096
+                };
+
+                if (secondaryConfig.url) AppStorage.set('wechat_secondary_api', secondaryConfig);
+                else AppStorage.Remove ? AppStorage.Remove('wechat_secondary_api') : localStorage.removeItem('wechat_secondary_api'); // Safe fallback
+
+                this.loadAPIList();
+                window.Utils.showToast('API配置已保存');
+            },
+
+            createNewAPI: function () {
+                window.Utils.showPrompt('新建API配置', '输入配置名称', (name) => {
+                    if (!name) return window.Utils.showToast('配置名称不能为空');
+                    const newKey = 'api_' + Date.now();
+                    const configs = AppStorage.get('wechat_api_configs', {});
+                    configs[newKey] = { ...this.DEFAULT_CONFIG, name: name, url: '', key: '' }; // Clean defaults
+                    AppStorage.set('wechat_api_configs', configs);
+                    AppStorage.set('wechat_current_api', newKey);
+                    this.loadAPIList();
+                    this.loadAPIConfig(newKey, 'primary');
+                    window.Utils.showToast('配置已创建');
+                });
+            },
+
+            deleteAPI: function () {
+                const currentKey = AppStorage.get('wechat_current_api', 'default');
+                if (currentKey === 'default') return window.Utils.showToast('默认配置不能删除');
+                window.Utils.showConfirm('确认删除？', (confirmed) => {
+                    if (!confirmed) return;
+                    const configs = AppStorage.get('wechat_api_configs', {});
+                    delete configs[currentKey];
+                    AppStorage.set('wechat_api_configs', configs);
+                    AppStorage.set('wechat_current_api', 'default');
+                    this.loadAPIList();
+                    this.loadAPIConfig('default', 'primary');
+                    window.Utils.showToast('配置已删除');
+                });
+            },
+
+            fetchModels: async function (type) {
+                const prefix = type === 'primary' ? 'primary' : 'secondary';
+                const url = document.getElementById(`${prefix}-api-url`).value;
+                const key = document.getElementById(`${prefix}-api-key`).value;
+
+                if (!url) {
+                    window.Utils.showToast('请先填写API地址');
+                    return;
+                }
 
                 try {
-                    let targetUrl = urlInput.value.trim();
-                    if (targetUrl.endsWith('/')) targetUrl = targetUrl.slice(0, -1);
-                    if (targetUrl.endsWith('/chat/completions')) targetUrl = targetUrl.replace('/chat/completions', '');
-                    if (!targetUrl.endsWith('/models')) targetUrl += '/models';
+                    window.Utils.showToast('正在拉取模型列表...');
 
-                    // 检查当前页面是否通过本地文件协议打开
-                    if (window.location.protocol === 'file:') {
-                        window.Utils.showToast('⚠️ 本地文件模式下可能存在跨域限制，建议使用HTTP服务器运行');
-                    }
-
-                    const res = await fetch(targetUrl, {
-                        method: 'GET',
+                    const response = await fetch(`${url}/models`, {
                         headers: {
-                            'Authorization': 'Bearer ' + keyInput.value.trim(),
+                            'Authorization': `Bearer ${key}`,
                             'Content-Type': 'application/json'
-                        },
-                        // 添加mode和credentials选项，提高跨浏览器兼容性
-                        mode: 'cors',
-                        credentials: 'omit'
+                        }
                     });
 
-                    if (!res.ok) {
-                        const errText = await res.text();
-                        throw new Error(`Status ${res.status}: ${errText}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
 
-                    const data = await res.json();
-                    const models = Array.isArray(data) ? data : (data.data || []);
+                    const data = await response.json();
+                    const models = data.data || data.models || [];
 
-                    if (models.length === 0) throw new Error('未找到模型数据');
+                    if (models.length === 0) {
+                        window.Utils.showToast('未找到可用模型');
+                        return;
+                    }
 
-                    const select = document.getElementById(`${prefix}model-select`);
+                    // 填充模型下拉列表
+                    const select = document.getElementById(`${prefix}-api-model-select`);
                     if (select) {
-                        select.innerHTML = '<option value="" disabled selected>▼ 请选择模型</option>' +
-                            models.map(m => `<option value="${m.id}">${m.id}</option>`).join('');
+                        select.innerHTML = '<option value="" disabled selected> 选择模型</option>' +
+                            models.map(m => {
+                                const modelId = m.id || m;
+                                return `<option value="${modelId}">${modelId}</option>`;
+                            }).join('');
                         select.classList.remove('hidden');
-
-                        window.Utils.showToast(`✨ 成功获取 ${models.length} 个模型！`);
-
-                        if (models.length > 0) {
-                            document.getElementById(`${prefix}model`).value = models[0].id;
-                            select.value = models[0].id;
-                        }
                     }
 
-                } catch (e) {
-                    let errorMsg = '拉取失败: ' + e.message;
-                    console.error('模型拉取错误详情:', e);
-                    console.error('错误类型:', e.name);
-                    console.error('错误堆栈:', e.stack);
+                    window.Utils.showToast(`成功拉取 ${models.length} 个模型`);
 
-                    if (e.message.includes('NetworkError') || e.name === 'NetworkError') {
-                        errorMsg = '网络连接失败，请检查网络设置或接口地址是否正确';
-                    } else if (e.message.includes('CORS') || e.name === 'TypeError' && e.message.includes('cors')) {
-                        errorMsg = '跨域错误！建议：1. 使用HTTP服务器运行页面 2. 检查API是否支持CORS 3. 尝试使用代理';
-                        // 针对Chrome浏览器的特殊提示
-                        if (navigator.userAgent.indexOf('Chrome') > -1) {
-                            errorMsg += '\nChrome对本地文件的跨域限制更严格，强烈建议使用HTTP服务器';
-                        }
-                    } else if (e.message.includes('401')) {
-                        errorMsg = '认证失败，请检查API密钥是否正确';
-                    } else if (e.name === 'TypeError' && e.message.includes('Failed to fetch')) {
-                        errorMsg = '请求失败！可能原因：1. 接口地址错误 2. 网络连接问题 3. 浏览器安全限制';
-                        // 针对本地文件模式的特殊提示
-                        if (window.location.protocol === 'file:') {
-                            errorMsg += '\n本地文件模式下，Chrome浏览器可能不允许发送跨域请求，请尝试使用HTTP服务器运行页面';
-                        }
-                    }
-                    window.Utils.showToast(errorMsg);
-                } finally {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
+                } catch (error) {
+                    console.error('[Settings Logic] 拉取模型失败:', error);
+                    window.Utils.showToast('拉取模型失败: ' + error.message);
                 }
             },
-            initTTS: () => {
-                const tts = Storage.get('tts_config', { engine: 'browser', minimax: {} });
+
+            // TTS 初始化 (修复后)
+            initTTS: function () {
+                const tts = AppStorage.get('tts_config', { engine: 'browser', minimax: {} });
                 document.getElementById('tts-engine').value = tts.engine || 'browser'; document.getElementById('minimax-group-id').value = tts.minimax.groupId || ''; document.getElementById('minimax-api-key').value = tts.minimax.apiKey || ''; document.getElementById('minimax-voice-id').value = tts.minimax.voiceId || ''; document.getElementById('minimax-model-id').value = tts.minimax.modelId || 'speech-01-turbo';
                 SettingsLogic.toggleTTSSettings();
             },
@@ -6343,7 +6419,7 @@
                     btn.innerHTML = originalText;
                 }
             },
-            saveTTS: () => { Utils.showToast('保存成功'); Storage.set('tts_config', { engine: document.getElementById('tts-engine').value, minimax: { apiKey: document.getElementById('minimax-api-key').value, groupId: document.getElementById('minimax-group-id').value, voiceId: document.getElementById('minimax-voice-id').value, modelId: document.getElementById('minimax-model-id').value } }); },
+            saveTTS: () => { Utils.showToast('保存成功'); AppStorage.set('tts_config', { engine: document.getElementById('tts-engine').value, minimax: { apiKey: document.getElementById('minimax-api-key').value, groupId: document.getElementById('minimax-group-id').value, voiceId: document.getElementById('minimax-voice-id').value, modelId: document.getElementById('minimax-model-id').value } }); },
             // 数据管理功能
             showExportDataModal: () => {
                 // 创建导出数据模态框
@@ -6369,7 +6445,7 @@
                                     <div class="pl-8 space-y-3">
                                         <h5 class="text-sm text-blue-200 font-medium">选择要导出的角色</h5>
                                         <div class="space-y-2">
-                                            ${Object.values(Storage.get('wechat_chars', {})).map(char => `
+                                            ${Object.values(AppStorage.get('wechat_chars', {})).map(char => `
                                                 <div class="flex items-center gap-3">
                                                     <input type="checkbox" id="export-wechat-${char.id}" class="w-4 h-4 rounded accent-blue-400" checked>
                                                     <label for="export-wechat-${char.id}" class="text-white/80 text-sm">${char.nickname || char.name || '未命名'}</label>
@@ -6414,7 +6490,7 @@
 
                 // 导出微信数据
                 if (document.getElementById('export-wechat').checked) {
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const selectedChars = Object.keys(chars).filter(charId => {
                         return document.getElementById(`export-wechat-${charId}`)?.checked;
                     });
@@ -6427,18 +6503,18 @@
 
                 // 导出系统设置
                 if (document.getElementById('export-settings').checked) {
-                    exportData.api_configs = Storage.get('api_configs');
-                    exportData.current_api_id = Storage.get('current_api_id');
-                    exportData.tts_config = Storage.get('tts_config');
-                    exportData.theme_config = Storage.get('theme_config');
-                    exportData.weather_config = Storage.get('weather_config');
+                    exportData.api_configs = AppStorage.get('api_configs');
+                    exportData.current_api_id = AppStorage.get('current_api_id');
+                    exportData.tts_config = AppStorage.get('tts_config');
+                    exportData.theme_config = AppStorage.get('theme_config');
+                    exportData.weather_config = AppStorage.get('weather_config');
                 }
 
                 // 导出世界书应用数据
                 if (document.getElementById('export-worldbook').checked) {
-                    exportData.wechat_worldbooks = Storage.get('wechat_worldbooks', {});
-                    exportData.wechat_worldbook_categories = Storage.get('wechat_worldbook_categories', {});
-                    exportData.wechat_worldbook_groups = Storage.get('wechat_worldbook_groups', {});
+                    exportData.wechat_worldbooks = AppStorage.get('wechat_worldbooks', {});
+                    exportData.wechat_worldbook_categories = AppStorage.get('wechat_worldbook_categories', {});
+                    exportData.wechat_worldbook_groups = AppStorage.get('wechat_worldbook_groups', {});
                 }
 
                 // 生成JSON文件并下载
@@ -6471,21 +6547,21 @@
                         if (confirm('确定要导入数据吗？这可能会覆盖现有数据。')) {
                             // 导入微信数据
                             if (importedData.wechat_chars) {
-                                const existingChars = Storage.get('wechat_chars', {});
+                                const existingChars = AppStorage.get('wechat_chars', {});
                                 const mergedChars = { ...existingChars, ...importedData.wechat_chars };
-                                Storage.set('wechat_chars', mergedChars);
+                                AppStorage.set('wechat_chars', mergedChars);
                             }
 
                             // 导入系统设置
-                            if (importedData.api_configs) Storage.set('api_configs', importedData.api_configs);
-                            if (importedData.current_api_id) Storage.set('current_api_id', importedData.current_api_id);
-                            if (importedData.tts_config) Storage.set('tts_config', importedData.tts_config);
-                            if (importedData.theme_config) Storage.set('theme_config', importedData.theme_config);
-                            if (importedData.weather_config) Storage.set('weather_config', importedData.weather_config);
+                            if (importedData.api_configs) AppStorage.set('api_configs', importedData.api_configs);
+                            if (importedData.current_api_id) AppStorage.set('current_api_id', importedData.current_api_id);
+                            if (importedData.tts_config) AppStorage.set('tts_config', importedData.tts_config);
+                            if (importedData.theme_config) AppStorage.set('theme_config', importedData.theme_config);
+                            if (importedData.weather_config) AppStorage.set('weather_config', importedData.weather_config);
                             // 导入世界书应用数据
-                            if (importedData.wechat_worldbooks) Storage.set('wechat_worldbooks', importedData.wechat_worldbooks);
-                            if (importedData.wechat_worldbook_categories) Storage.set('wechat_worldbook_categories', importedData.wechat_worldbook_categories);
-                            if (importedData.wechat_worldbook_groups) Storage.set('wechat_worldbook_groups', importedData.wechat_worldbook_groups);
+                            if (importedData.wechat_worldbooks) AppStorage.set('wechat_worldbooks', importedData.wechat_worldbooks);
+                            if (importedData.wechat_worldbook_categories) AppStorage.set('wechat_worldbook_categories', importedData.wechat_worldbook_categories);
+                            if (importedData.wechat_worldbook_groups) AppStorage.set('wechat_worldbook_groups', importedData.wechat_worldbook_groups);
 
                             Utils.showToast('数据导入成功');
 
@@ -6557,7 +6633,7 @@
                 `).join('');
 
                 // 初始化图片压缩质量滑块
-                const quality = Storage.get('image_compress_quality', 0.7);
+                const quality = AppStorage.get('image_compress_quality', 0.7);
                 const slider = document.getElementById('compress-quality-slider');
                 const valueDisplay = document.getElementById('compress-quality-value');
                 if (slider && valueDisplay) {
@@ -6568,7 +6644,7 @@
             // 更新图片压缩质量设置
             updateCompressQuality: (value) => {
                 const quality = parseFloat(value);
-                Storage.set('image_compress_quality', quality);
+                AppStorage.set('image_compress_quality', quality);
                 const valueDisplay = document.getElementById('compress-quality-value');
                 if (valueDisplay) {
                     valueDisplay.textContent = `${Math.round(quality * 100)}%`;
@@ -6591,7 +6667,7 @@
                             <div class="text-gray-600 mb-6">
                                 <p>确定要压缩所有聊天图片吗？</p>
                                 <p class="text-sm text-gray-500 mt-2">
-                                    压缩将使用当前设置的压缩质量：<span id="confirm-quality-value" class="font-medium">${Math.round(Storage.get('image_compress_quality', 0.7) * 100)}%</span>
+                                    压缩将使用当前设置的压缩质量：<span id="confirm-quality-value" class="font-medium">${Math.round(AppStorage.get('image_compress_quality', 0.7) * 100)}%</span>
                                 </p>
                                 <p class="text-sm text-gray-500 mt-1">
                                     此操作可能需要一些时间，压缩后将无法恢复原图。
@@ -6617,10 +6693,10 @@
                 Utils.showToast('开始压缩聊天图片...');
 
                 // 获取当前压缩质量
-                const quality = Storage.get('image_compress_quality', 0.7);
+                const quality = AppStorage.get('image_compress_quality', 0.7);
 
                 // 获取所有聊天角色
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 let compressedCount = 0;
                 let totalImages = 0;
 
@@ -6658,7 +6734,7 @@
                                         // 如果所有图片都压缩完成
                                         if (compressedCount === totalImages) {
                                             // 保存压缩后的聊天记录
-                                            Storage.set('wechat_chars', chars);
+                                            AppStorage.set('wechat_chars', chars);
                                             Utils.showToast(`成功压缩 ${compressedCount} 张图片`);
                                             SettingsLogic.renderStorageView(); // 刷新存储空间视图
                                         }
@@ -6668,7 +6744,7 @@
                                     compressedCount++;
 
                                     if (compressedCount === totalImages) {
-                                        Storage.set('wechat_chars', chars);
+                                        AppStorage.set('wechat_chars', chars);
                                         Utils.showToast(`成功压缩 ${compressedCount} 张图片，部分图片压缩失败`);
                                         SettingsLogic.renderStorageView();
                                     }
@@ -6693,18 +6769,18 @@
                 }
                 else if (type === 'chats') {
                     // 清空聊天记录但保留角色
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     Object.keys(chars).forEach(k => {
                         chars[k].msgs = []; // 清空消息数组
                         chars[k].memory = []; // 清空记忆
                         chars[k].innerVoices = []; // 清空心声
                     });
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     Utils.showToast('所有聊天记录已清空（角色保留）');
                 }
                 else if (type === 'moments') {
                     // 清空朋友圈
-                    Storage.set('wechat_moments', []);
+                    AppStorage.set('wechat_moments', []);
                     Utils.showToast('朋友圈已清空');
                 }
 
@@ -6756,16 +6832,16 @@
             },
             resetAppData: () => {
                 if (document.getElementById('reset-wechat').checked) {
-                    Storage.set('wechat_chars', {});
-                    Storage.set('wechat_npcs', {});
+                    AppStorage.set('wechat_chars', {});
+                    AppStorage.set('wechat_npcs', {});
                 }
 
                 if (document.getElementById('reset-settings').checked) {
-                    Storage.set('api_configs', [{ id: 'default', name: '默认设置', url: '', key: '', model: '', temp: 0.7 }]);
-                    Storage.set('current_api_id', 'default');
-                    Storage.set('tts_config', { engine: 'browser', minimax: {} });
-                    Storage.set('theme_config', {});
-                    Storage.set('weather_config', {});
+                    AppStorage.set('api_configs', [{ id: 'default', name: '默认设置', url: '', key: '', model: '', temp: 0.7 }]);
+                    AppStorage.set('current_api_id', 'default');
+                    AppStorage.set('tts_config', { engine: 'browser', minimax: {} });
+                    AppStorage.set('theme_config', {});
+                    AppStorage.set('weather_config', {});
                 }
 
                 Utils.showToast('应用数据重置成功');
@@ -6829,11 +6905,11 @@
                 const config = SettingsLogic.configs.find(c => c.id === targetConfigId);
                 if (!config || !config.key) throw new Error("API配置无效");
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
 
                 // --- 世界书与记忆注入 ---
-                const books = Storage.get('wechat_worldbooks', {});
+                const books = AppStorage.get('wechat_worldbooks', {});
                 let worldInfo = "";
                 if (char && char.worldbookEntries) {
                     char.worldbookEntries.forEach(entryId => {
@@ -6861,7 +6937,7 @@
 
                 // --- 表情包库注入 ---
                 let emojiInfo = "";
-                const globalEmojis = Storage.get('wechat_global_emojis', []);
+                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                 const charEmojis = char ? (char.emojis || []) : [];
                 const allEmojis = [...globalEmojis, ...charEmojis];
                 if (allEmojis.length > 0) {
@@ -6888,7 +6964,7 @@
                 momentsInfo += "   - 改签名：[SET_BIO:新签名]\n";
 
                 // --- 朋友圈感知 ---
-                const allMoments = Storage.get('wechat_moments', []);
+                const allMoments = AppStorage.get('wechat_moments', []);
                 const recent = allMoments.slice(0, 5); // 取最近5条
                 let envInfo = "";
                 if (recent.length > 0) {
@@ -7102,7 +7178,7 @@
             },
 
             generateTTS: async function (text, charSettings) {
-                const globalTTS = Storage.get('tts_config', { engine: 'browser', minimax: {} });
+                const globalTTS = AppStorage.get('tts_config', { engine: 'browser', minimax: {} });
 
                 // 1. 获取情感参数 (这是免费提升效果的关键！)
                 // 注意：需要通过 SettingsLogic 调用上面的函数
@@ -7259,18 +7335,18 @@
                 }
                 else if (type === 'chats') {
                     // 清空聊天记录但保留角色
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     Object.keys(chars).forEach(k => {
                         chars[k].msgs = []; // 清空消息数组
                         chars[k].memory = []; // 清空记忆
                         chars[k].innerVoices = []; // 清空心声
                     });
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     Utils.showToast('所有聊天记录已清空（角色保留）');
                 }
                 else if (type === 'moments') {
                     // 清空朋友圈
-                    Storage.set('wechat_moments', []);
+                    AppStorage.set('wechat_moments', []);
                     Utils.showToast('朋友圈已清空');
                 }
 
@@ -7279,7 +7355,7 @@
         };
         window.ThemeLogic = {
             init: () => {
-                const t = Storage.get('theme_config', {});
+                const t = AppStorage.get('theme_config', {});
                 ThemeLogic.apply(t);
                 ThemeLogic.loadPresets();
                 ThemeLogic.updateFontSettings();
@@ -7367,7 +7443,7 @@
                 }
             },
             saveTheme: () => {
-                const t = Storage.get('theme_config', { icons: {}, widgets: {}, font: {}, globalBg: '', widgetCards: {} });
+                const t = AppStorage.get('theme_config', { icons: {}, widgets: {}, font: {}, globalBg: '', widgetCards: {} });
                 t.css = document.getElementById('theme-css').value;
 
                 // Save font settings
@@ -7386,7 +7462,7 @@
                 t.widgetCards.locationCard = document.getElementById('location-card-bg-url').value;
                 t.widgetCards.weatherCard = document.getElementById('weather-card-bg-url').value;
 
-                Storage.set('theme_config', t);
+                AppStorage.set('theme_config', t);
                 ThemeLogic.apply(t);
                 Utils.showToast('美化保存');
             },
@@ -7395,27 +7471,27 @@
             applyFontUrl: () => {
                 const url = document.getElementById('font-url').value;
                 if (url) {
-                    const t = Storage.get('theme_config', { font: {} });
+                    const t = AppStorage.get('theme_config', { font: {} });
                     t.font.url = url;
-                    Storage.set('theme_config', t);
+                    AppStorage.set('theme_config', t);
                     ThemeLogic.apply(t);
                     Utils.showToast('字体应用成功');
                 }
             },
             updateFontSettings: () => {
-                const t = Storage.get('theme_config', { font: {} });
+                const t = AppStorage.get('theme_config', { font: {} });
                 document.getElementById('font-color').value = t.font.color || '#166534';
                 document.getElementById('font-shadow').value = t.font.shadow || '';
                 document.getElementById('font-url').value = t.font.url || '';
             },
             restoreDefaultFont: () => {
-                const t = Storage.get('theme_config', { font: {} });
+                const t = AppStorage.get('theme_config', { font: {} });
                 t.font = {
                     color: '#166534',
                     shadow: '',
                     url: ''
                 };
-                Storage.set('theme_config', t);
+                AppStorage.set('theme_config', t);
                 ThemeLogic.apply(t);
                 ThemeLogic.updateFontSettings();
                 Utils.showToast('字体已恢复默认');
@@ -7425,9 +7501,9 @@
             applyGlobalBgUrl: () => {
                 const url = document.getElementById('global-bg-url-input').value;
                 if (url) {
-                    const t = Storage.get('theme_config', {});
+                    const t = AppStorage.get('theme_config', {});
                     t.globalBg = url;
-                    Storage.set('theme_config', t);
+                    AppStorage.set('theme_config', t);
                     ThemeLogic.apply(t);
                     ThemeLogic.updateGlobalBgPreview();
                     Utils.showToast('全局背景应用成功');
@@ -7437,9 +7513,9 @@
                 if (input.files[0]) {
                     // 修改：全局背景强制高清 1080px
                     Utils.compressImage(input.files[0], 1080, 0.85).then(base64 => {
-                        const t = Storage.get('theme_config', {});
+                        const t = AppStorage.get('theme_config', {});
                         t.globalBg = base64;
-                        Storage.set('theme_config', t);
+                        AppStorage.set('theme_config', t);
                         ThemeLogic.apply(t);
                         document.getElementById('global-bg-url-input').value = base64;
                         ThemeLogic.updateGlobalBgPreview();
@@ -7448,9 +7524,9 @@
                 }
             },
             resetGlobalBg: () => {
-                const t = Storage.get('theme_config', {});
+                const t = AppStorage.get('theme_config', {});
                 t.globalBg = '';
-                Storage.set('theme_config', t);
+                AppStorage.set('theme_config', t);
                 document.documentElement.style.setProperty('--app-bg-color', '#f0fdf4');
                 document.body.style.backgroundImage = '';
                 document.body.style.backgroundSize = 'auto';
@@ -7461,13 +7537,13 @@
                 Utils.showToast('全局背景已重置');
             },
             updateGlobalBgPreview: () => {
-                const t = Storage.get('theme_config', {});
+                const t = AppStorage.get('theme_config', {});
                 document.getElementById('global-bg-preview-box').style.backgroundImage = t.globalBg ? `url(${t.globalBg})` : '';
             },
 
             // Preset Management
             loadPresets: () => {
-                const presets = Storage.get('theme_presets', {});
+                const presets = AppStorage.get('theme_presets', {});
                 const select = document.getElementById('preset-select');
                 select.innerHTML = '<option value="">选择预设...</option>' +
                     Object.keys(presets).map(name => `<option value="${name}">${name}</option>`).join('');
@@ -7476,10 +7552,10 @@
                 const name = document.getElementById('preset-name').value;
                 if (!name) return Utils.showToast('请输入预设名称');
 
-                const t = Storage.get('theme_config', { icons: {}, widgets: {}, font: {}, globalBg: '' });
-                const presets = Storage.get('theme_presets', {});
+                const t = AppStorage.get('theme_config', { icons: {}, widgets: {}, font: {}, globalBg: '' });
+                const presets = AppStorage.get('theme_presets', {});
                 presets[name] = t;
-                Storage.set('theme_presets', presets);
+                AppStorage.set('theme_presets', presets);
 
                 document.getElementById('preset-name').value = '';
                 ThemeLogic.loadPresets();
@@ -7487,10 +7563,10 @@
             },
             loadPreset: (name) => {
                 if (!name) return;
-                const presets = Storage.get('theme_presets', {});
+                const presets = AppStorage.get('theme_presets', {});
                 const preset = presets[name];
                 if (preset) {
-                    Storage.set('theme_config', preset);
+                    AppStorage.set('theme_config', preset);
                     ThemeLogic.apply(preset);
                     ThemeLogic.updateFontSettings();
                     document.getElementById('theme-css').value = preset.css || '';
@@ -7506,9 +7582,9 @@
                 const name = document.getElementById('preset-select').value;
                 if (!name) return Utils.showToast('请选择要删除的预设');
 
-                const presets = Storage.get('theme_presets', {});
+                const presets = AppStorage.get('theme_presets', {});
                 delete presets[name];
-                Storage.set('theme_presets', presets);
+                AppStorage.set('theme_presets', presets);
                 ThemeLogic.loadPresets();
                 Utils.showToast('预设删除成功');
             },
@@ -7516,7 +7592,7 @@
             // Reset and Restore Defaults
             resetAll: () => {
                 if (confirm('确定要重置所有美化设置吗？')) {
-                    Storage.set('theme_config', {});
+                    AppStorage.set('theme_config', {});
                     ThemeLogic.apply({});
                     ThemeLogic.updateFontSettings();
                     document.getElementById('theme-css').value = '';
@@ -7553,10 +7629,10 @@
 
                 const url = document.getElementById(urlInputId).value;
                 if (url) {
-                    const t = Storage.get('theme_config', { widgetCards: {} });
+                    const t = AppStorage.get('theme_config', { widgetCards: {} });
                     t.widgetCards = t.widgetCards || {};
                     t.widgetCards[cardType] = url;
-                    Storage.set('theme_config', t);
+                    AppStorage.set('theme_config', t);
                     ThemeLogic.apply(t);
                     Utils.showToast('小组件背景应用成功');
                 }
@@ -7564,7 +7640,7 @@
 
             // 更新桌面小组件背景输入框值和预览
             updateWidgetCardBgInputs: () => {
-                const t = Storage.get('theme_config', { widgetCards: {} });
+                const t = AppStorage.get('theme_config', { widgetCards: {} });
                 if (t.widgetCards) {
                     document.getElementById('time-card-bg-url').value = t.widgetCards.timeCard || '';
                     document.getElementById('location-card-bg-url').value = t.widgetCards.locationCard || '';
@@ -7577,7 +7653,7 @@
 
             // 更新桌面小组件背景预览
             updateWidgetCardPreviews: () => {
-                const t = Storage.get('theme_config', { widgetCards: {} });
+                const t = AppStorage.get('theme_config', { widgetCards: {} });
                 if (t.widgetCards) {
                     document.getElementById('time-card-preview-box').innerHTML = t.widgetCards.timeCard ? `<img src="${t.widgetCards.timeCard}" class="w-full h-full object-cover">` : '';
                     document.getElementById('location-card-preview-box').innerHTML = t.widgetCards.locationCard ? `<img src="${t.widgetCards.locationCard}" class="w-full h-full object-cover">` : '';
@@ -7595,10 +7671,10 @@
             handleWidgetCardUpload: (input) => {
                 if (input.files[0] && ThemeLogic.currentWidgetCard) {
                     Utils.compressImage(input.files[0], 512, 0.7).then(base64 => {
-                        const t = Storage.get('theme_config', { widgetCards: {} });
+                        const t = AppStorage.get('theme_config', { widgetCards: {} });
                         t.widgetCards = t.widgetCards || {};
                         t.widgetCards[ThemeLogic.currentWidgetCard] = base64;
-                        Storage.set('theme_config', t);
+                        AppStorage.set('theme_config', t);
                         ThemeLogic.apply(t);
                         ThemeLogic.updateWidgetCardBgInputs();
                         Utils.showToast('小组件背景上传成功');
@@ -7610,15 +7686,15 @@
             applyUrl: (type) => {
                 const url = document.getElementById(`${type}-url-input`).value.trim();
                 if (!url) return Utils.showToast('请输入URL');
-                const t = Storage.get('theme_config', { icons: {}, widgets: {} });
+                const t = AppStorage.get('theme_config', { icons: {}, widgets: {} });
                 if (type === 'wallpaper') {
                     t.wallpaper = url;
-                    Storage.set('theme_config', t);
+                    AppStorage.set('theme_config', t);
                     ThemeLogic.apply(t);
                     ThemeLogic.updateWallpaperPreview();
                 } else {
                     t.icons[document.getElementById('icon-selector').value] = url;
-                    Storage.set('theme_config', t);
+                    AppStorage.set('theme_config', t);
                     ThemeLogic.apply(t);
                     ThemeLogic.updateIconPreview();
                 }
@@ -7631,10 +7707,10 @@
                     const quality = type === 'wallpaper' ? 0.9 : 0.7;
 
                     Utils.compressImage(input.files[0], width, quality).then(base64 => {
-                        const t = Storage.get('theme_config', { icons: {}, widgets: {} });
+                        const t = AppStorage.get('theme_config', { icons: {}, widgets: {} });
                         if (type === 'wallpaper') t.wallpaper = base64;
                         else t.icons[document.getElementById('icon-selector').value] = base64;
-                        Storage.set('theme_config', t);
+                        AppStorage.set('theme_config', t);
                         ThemeLogic.apply(t);
                         if (type === 'wallpaper') ThemeLogic.updateWallpaperPreview();
                         else ThemeLogic.updateIconPreview();
@@ -7642,12 +7718,12 @@
                 }
             },
 
-            handleWidgetUpload: (input) => { if (input.files[0] && ThemeLogic.currentWidget) Utils.compressImage(input.files[0]).then(base64 => { const t = Storage.get('theme_config', { icons: {}, widgets: {} }); t.widgets[ThemeLogic.currentWidget] = base64; Storage.set('theme_config', t); ThemeLogic.apply(t); ThemeLogic.updateWidgetPreviews(); }); },
+            handleWidgetUpload: (input) => { if (input.files[0] && ThemeLogic.currentWidget) Utils.compressImage(input.files[0]).then(base64 => { const t = AppStorage.get('theme_config', { icons: {}, widgets: {} }); t.widgets[ThemeLogic.currentWidget] = base64; AppStorage.set('theme_config', t); ThemeLogic.apply(t); ThemeLogic.updateWidgetPreviews(); }); },
             triggerWidgetUpload: (id) => { ThemeLogic.currentWidget = id; document.getElementById('upload-widget').click(); },
-            resetWallpaper: () => { const t = Storage.get('theme_config', {}); t.wallpaper = ''; Storage.set('theme_config', t); document.getElementById('wallpaper-layer').style.backgroundImage = ''; ThemeLogic.updateWallpaperPreview(); },
-            updateWallpaperPreview: () => { const t = Storage.get('theme_config', {}); document.getElementById('wallpaper-preview-box').style.backgroundImage = t.wallpaper ? `url(${t.wallpaper})` : ''; },
-            updateIconPreview: () => { const t = Storage.get('theme_config', { icons: {} }); const k = document.getElementById('icon-selector').value; document.getElementById('icon-preview-box').innerHTML = t.icons[k] ? `<img src="${t.icons[k]}">` : ''; },
-            updateWidgetPreviews: () => { const t = Storage.get('theme_config', { widgets: {} });['card1', 'card2'].forEach(id => document.getElementById(id === 'card1' ? 'widget1-preview-box' : 'widget2-preview-box').innerHTML = t.widgets[id] ? `<img src="${t.widgets[id]}">` : ''); }
+            resetWallpaper: () => { const t = AppStorage.get('theme_config', {}); t.wallpaper = ''; AppStorage.set('theme_config', t); document.getElementById('wallpaper-layer').style.backgroundImage = ''; ThemeLogic.updateWallpaperPreview(); },
+            updateWallpaperPreview: () => { const t = AppStorage.get('theme_config', {}); document.getElementById('wallpaper-preview-box').style.backgroundImage = t.wallpaper ? `url(${t.wallpaper})` : ''; },
+            updateIconPreview: () => { const t = AppStorage.get('theme_config', { icons: {} }); const k = document.getElementById('icon-selector').value; document.getElementById('icon-preview-box').innerHTML = t.icons[k] ? `<img src="${t.icons[k]}">` : ''; },
+            updateWidgetPreviews: () => { const t = AppStorage.get('theme_config', { widgets: {} });['card1', 'card2'].forEach(id => document.getElementById(id === 'card1' ? 'widget1-preview-box' : 'widget2-preview-box').innerHTML = t.widgets[id] ? `<img src="${t.widgets[id]}">` : ''); }
         };
 
         // Worldbook Logic
@@ -7657,9 +7733,9 @@
             categories: {},
             groups: {},
             init: () => {
-                WorldbookUI.books = Storage.get('wechat_worldbooks', {});
-                WorldbookUI.categories = Storage.get('wechat_worldbook_categories', {});
-                WorldbookUI.groups = Storage.get('wechat_worldbook_groups', {});
+                WorldbookUI.books = AppStorage.get('wechat_worldbooks', {});
+                WorldbookUI.categories = AppStorage.get('wechat_worldbook_categories', {});
+                WorldbookUI.groups = AppStorage.get('wechat_worldbook_groups', {});
             },
             renderList: () => {
                 WorldbookUI.init();
@@ -7745,7 +7821,7 @@
                     if (!name) return;
                     const id = 'wb_' + Date.now();
                     WorldbookUI.books[id] = { id, name, entries: [], categoryId: null, groupId: null };
-                    Storage.set('wechat_worldbooks', WorldbookUI.books);
+                    AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                     WorldbookUI.renderList();
                 });
             },
@@ -7768,7 +7844,7 @@
                     WorldbookUI.books[WorldbookUI.currentBookId].name = name;
                     WorldbookUI.books[WorldbookUI.currentBookId].categoryId = categoryId;
                     WorldbookUI.books[WorldbookUI.currentBookId].groupId = groupId;
-                    Storage.set('wechat_worldbooks', WorldbookUI.books);
+                    AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                 }
                 document.getElementById('wb-edit-view').classList.add('hidden');
                 document.getElementById('wb-edit-view').classList.remove('flex');
@@ -7798,19 +7874,19 @@
             addEntry: () => {
                 const book = WorldbookUI.books[WorldbookUI.currentBookId];
                 book.entries.push({ title: '', keys: '', content: '', enabled: true });
-                Storage.set('wechat_worldbooks', WorldbookUI.books);
+                AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                 WorldbookUI.renderEntries();
             },
             updateEntry: (idx, field, val) => {
                 const book = WorldbookUI.books[WorldbookUI.currentBookId];
                 book.entries[idx][field] = val;
-                Storage.set('wechat_worldbooks', WorldbookUI.books);
+                AppStorage.set('wechat_worldbooks', WorldbookUI.books);
             },
             deleteEntry: (idx) => {
                 if (!confirm('删除此条目?')) return;
                 const book = WorldbookUI.books[WorldbookUI.currentBookId];
                 book.entries.splice(idx, 1);
-                Storage.set('wechat_worldbooks', WorldbookUI.books);
+                AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                 WorldbookUI.renderEntries();
             },
             // Category Management
@@ -7850,7 +7926,7 @@
                 }
                 const id = 'cat_' + Date.now();
                 WorldbookUI.categories[id] = { id, name };
-                Storage.set('wechat_worldbook_categories', WorldbookUI.categories);
+                AppStorage.set('wechat_worldbook_categories', WorldbookUI.categories);
                 document.getElementById('wb-new-category-name').value = '';
                 WorldbookUI.renderCategoryList();
                 WorldbookUI.updateFilters();
@@ -7864,8 +7940,8 @@
                         book.categoryId = null;
                     }
                 });
-                Storage.set('wechat_worldbook_categories', WorldbookUI.categories);
-                Storage.set('wechat_worldbooks', WorldbookUI.books);
+                AppStorage.set('wechat_worldbook_categories', WorldbookUI.categories);
+                AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                 WorldbookUI.renderCategoryList();
                 WorldbookUI.updateFilters();
                 WorldbookUI.renderList();
@@ -7907,7 +7983,7 @@
                 }
                 const id = 'grp_' + Date.now();
                 WorldbookUI.groups[id] = { id, name };
-                Storage.set('wechat_worldbook_groups', WorldbookUI.groups);
+                AppStorage.set('wechat_worldbook_groups', WorldbookUI.groups);
                 document.getElementById('wb-new-group-name').value = '';
                 WorldbookUI.renderGroupList();
                 WorldbookUI.updateFilters();
@@ -7921,8 +7997,8 @@
                         book.groupId = null;
                     }
                 });
-                Storage.set('wechat_worldbook_groups', WorldbookUI.groups);
-                Storage.set('wechat_worldbooks', WorldbookUI.books);
+                AppStorage.set('wechat_worldbook_groups', WorldbookUI.groups);
+                AppStorage.set('wechat_worldbooks', WorldbookUI.books);
                 WorldbookUI.renderGroupList();
                 WorldbookUI.updateFilters();
                 WorldbookUI.renderList();
@@ -7931,7 +8007,7 @@
             renderSettingsList: () => {
                 WorldbookUI.init();
                 const cid = WeChatUI.currentChatId;
-                const char = Storage.get('wechat_chars', {})[cid];
+                const char = AppStorage.get('wechat_chars', {})[cid];
                 const selectedEntries = char ? char.worldbookEntries || [] : []; // Array of entry IDs: "bookId_entryIdx"
 
                 const allBooks = WorldbookUI.books;
@@ -8026,7 +8102,7 @@
                 }
             },
             toggleEntryForChar: (cid, entryId, checked) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 let char = chars[cid];
 
                 // 如果char不存在，创建一个新的char对象
@@ -8041,15 +8117,15 @@
                 } else {
                     char.worldbookEntries = char.worldbookEntries.filter(id => id !== entryId);
                 }
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
             },
             // Injection Logic
             scanAndInject: (text) => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const char = Storage.get('wechat_chars', {})[cid];
+                const char = AppStorage.get('wechat_chars', {})[cid];
                 if (!char || !char.worldbookEntries || char.worldbookEntries.length === 0) return '';
 
-                const allBooks = Storage.get('wechat_worldbooks', {});
+                const allBooks = AppStorage.get('wechat_worldbooks', {});
                 let injectedContent = '';
 
                 char.worldbookEntries.forEach(entryId => {
@@ -8144,7 +8220,7 @@
             // --- 【核心修复】数据渲染逻辑 ---
             renderCardData: () => {
                 if (!InnerVoiceUI.currentCharId) return;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[InnerVoiceUI.currentCharId];
                 const voices = char.innerVoices || [];
 
@@ -8216,7 +8292,7 @@
             },
 
             renderHistoryList: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[InnerVoiceUI.currentCharId];
                 const voices = (char.innerVoices || []).slice().reverse();
                 const listEl = document.getElementById('voice-history-list');
@@ -8256,14 +8332,14 @@
 
             deleteCurrent: () => {
                 if (!confirm('确定删除这条心声吗？')) return;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[InnerVoiceUI.currentCharId];
                 const voices = char.innerVoices || [];
 
                 const idx = InnerVoiceUI.currentIndex === -1 ? voices.length - 1 : InnerVoiceUI.currentIndex;
                 if (idx >= 0 && idx < voices.length) {
                     voices.splice(idx, 1);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     InnerVoiceUI.currentIndex = -1;
                     InnerVoiceUI.renderCardData();
                     Utils.showToast('已删除');
@@ -8271,7 +8347,7 @@
             },
 
             addVoice: (content) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const cid = document.getElementById('subpage-chat-detail')?.dataset.charId;
                 if (!cid) return;
 
@@ -8307,7 +8383,7 @@
                     content: savedContent,
                     timestamp: Date.now()
                 });
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
             },
 
             // --- 粒子动画 (保持不变) ---
@@ -8518,7 +8594,7 @@
             ],
             init: () => {
                 // 1. 读取并修复数据
-                let raw = Storage.get('wechat_moments', []);
+                let raw = AppStorage.get('wechat_moments', []);
                 // 确保有ID
                 raw.forEach(m => { if (!m.id) m.id = Date.now() + Math.random().toString(36).substr(2, 5); });
                 MomentsOS.data = raw.sort((a, b) => b.timestamp - a.timestamp);
@@ -8532,12 +8608,12 @@
                 if (!container) return;
 
                 // 1. 确定头部信息
-                let owner = Storage.get('wechat_user_profile', { name: '我' });
+                let owner = AppStorage.get('wechat_user_profile', { name: '我' });
                 let isMe = true;
 
                 if (targetId && targetId !== 'user') {
-                    const chars = Storage.get('wechat_chars', {});
-                    const npcs = Storage.get('wechat_npcs', {});
+                    const chars = AppStorage.get('wechat_chars', {});
+                    const npcs = AppStorage.get('wechat_npcs', {});
                     const target = chars[targetId] || npcs[targetId];
                     if (target) {
                         owner = {
@@ -8593,10 +8669,10 @@
                 let name = '我', avatar = '';
                 const isMe = m.authorType === 'user';
                 if (isMe) {
-                    const u = Storage.get('wechat_user_profile', {});
+                    const u = AppStorage.get('wechat_user_profile', {});
                     name = u.name || '我'; avatar = u.avatar;
                 } else {
-                    const c = Storage.get('wechat_chars', {})[m.authorId] || Storage.get('wechat_npcs', {})[m.authorId];
+                    const c = AppStorage.get('wechat_chars', {})[m.authorId] || AppStorage.get('wechat_npcs', {})[m.authorId];
                     if (c) { name = c.nickname || c.name; avatar = c.avatar; }
                 }
 
@@ -8692,16 +8768,16 @@
             hideAllMenus: () => document.querySelectorAll('.moments-menu-pop').forEach(e => e.classList.add('hidden')),
 
             // 互动
-            like: (id) => { const m = MomentsOS.data.find(x => x.id == id); if (!m) return; if (!m.likes) m.likes = []; const me = Storage.get('wechat_user_profile', { name: '我' }).name; if (m.likes.includes(me)) m.likes = m.likes.filter(n => n !== me); else m.likes.push(me); MomentsOS.saveAndRender(); },
-            comment: (id) => { MomentsOS.hideAllMenus(); Utils.showPrompt('评论', '输入内容', (val) => { if (val) { const m = MomentsOS.data.find(x => x.id == id); if (!m.comments) m.comments = []; m.comments.push({ author: Storage.get('wechat_user_profile', { name: '我' }).name, content: val }); MomentsOS.saveAndRender(); } }); },
+            like: (id) => { const m = MomentsOS.data.find(x => x.id == id); if (!m) return; if (!m.likes) m.likes = []; const me = AppStorage.get('wechat_user_profile', { name: '我' }).name; if (m.likes.includes(me)) m.likes = m.likes.filter(n => n !== me); else m.likes.push(me); MomentsOS.saveAndRender(); },
+            comment: (id) => { MomentsOS.hideAllMenus(); Utils.showPrompt('评论', '输入内容', (val) => { if (val) { const m = MomentsOS.data.find(x => x.id == id); if (!m.comments) m.comments = []; m.comments.push({ author: AppStorage.get('wechat_user_profile', { name: '我' }).name, content: val }); MomentsOS.saveAndRender(); } }); },
             edit: (id) => { MomentsOS.hideAllMenus(); const m = MomentsOS.data.find(x => x.id == id); if (m) Utils.showPrompt('编辑', '', (val) => { if (val !== null) { m.content = val; MomentsOS.saveAndRender(); } }); },
             delete: (id) => { if (confirm('删除动态？')) { MomentsOS.data = MomentsOS.data.filter(x => x.id != id); MomentsOS.saveAndRender(); } },
-            reply: (id, target) => { const me = Storage.get('wechat_user_profile', { name: '我' }).name; if (target === me) return; Utils.showPrompt(`回复 ${target}`, '', (val) => { if (val) { const m = MomentsOS.data.find(x => x.id == id); m.comments.push({ author: me, content: val, replyTo: target }); MomentsOS.saveAndRender(); } }); },
+            reply: (id, target) => { const me = AppStorage.get('wechat_user_profile', { name: '我' }).name; if (target === me) return; Utils.showPrompt(`回复 ${target}`, '', (val) => { if (val) { const m = MomentsOS.data.find(x => x.id == id); m.comments.push({ author: me, content: val, replyTo: target }); MomentsOS.saveAndRender(); } }); },
 
             // AI 生成
             generate: async () => {
                 Utils.showToast('AI 正在构思新动态...');
-                const chars = Object.values(Storage.get('wechat_chars', {}));
+                const chars = Object.values(AppStorage.get('wechat_chars', {}));
                 if (chars.length === 0) return Utils.showToast('请先创建角色');
 
                 // 随机选一个角色
@@ -8758,7 +8834,7 @@
             // 生成多条动态并添加互动
             generateMultiple: async () => {
                 Utils.showToast('AI 正在批量生成动态...');
-                const chars = Object.values(Storage.get('wechat_chars', {}));
+                const chars = Object.values(AppStorage.get('wechat_chars', {}));
                 if (chars.length === 0) return Utils.showToast('请先创建角色');
 
                 // 生成3-8条动态
@@ -8860,7 +8936,7 @@
                 let enabled = false;
 
                 // 优先读取本地存储的配置 (因为弹窗可能没打开)
-                const user = Storage.get('wechat_user_profile', {});
+                const user = AppStorage.get('wechat_user_profile', {});
                 if (user.momentsAuto !== undefined) enabled = user.momentsAuto;
                 if (user.momentsInterval) interval = parseInt(user.momentsInterval);
 
@@ -8881,7 +8957,7 @@
             },
 
             // 辅助
-            saveAndRender: () => { Storage.set('wechat_moments', MomentsOS.data); MomentsOS.render(); },
+            saveAndRender: () => { AppStorage.set('wechat_moments', MomentsOS.data); MomentsOS.render(); },
             clearAll: (targetIds = []) => {
                 if (targetIds.length === 0) {
                     if (confirm('确定要清空所有朋友圈吗？')) {
@@ -8906,7 +8982,7 @@
                     id: m.id,
                     text: m.content,
                     image: m.images && m.images.length > 0 ? m.images[0] : '',
-                    author: m.authorType === 'user' ? '我' : (Storage.get('wechat_chars', {})[m.authorId] || Storage.get('wechat_npcs', {})[m.authorId]).name || '好友'
+                    author: m.authorType === 'user' ? '我' : (AppStorage.get('wechat_chars', {})[m.authorId] || AppStorage.get('wechat_npcs', {})[m.authorId]).name || '好友'
                 };
 
                 // 这里可以添加分享到聊天的逻辑
@@ -8951,8 +9027,8 @@
                     });
 
                     // 随机添加点赞
-                    const chars = Object.values(Storage.get('wechat_chars', {}));
-                    const npcs = Object.values(Storage.get('wechat_npcs', {}));
+                    const chars = Object.values(AppStorage.get('wechat_chars', {}));
+                    const npcs = Object.values(AppStorage.get('wechat_npcs', {}));
                     const allFriends = [...chars, ...npcs];
                     const likeCount = Math.floor(Math.random() * 3) + 2;
 
@@ -8978,7 +9054,7 @@
 
             // 初始化：渲染角色列表
             init: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const list = document.getElementById('search-char-list');
                 list.innerHTML = Object.values(chars).map(c => `
                     <div onclick="SearchPhoneUI.openCharPhone('${c.id}')" class="flex flex-col items-center gap-2 cursor-pointer p-2 rounded-xl hover:bg-white/10 transition-all">
@@ -8992,7 +9068,7 @@
 
             // 进入伪装桌面
             openCharPhone: (id) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[id]) return;
                 SearchPhoneUI.targetCharId = id;
                 document.getElementById('search-desktop-title').textContent = chars[id].name + '的手机';
@@ -9042,10 +9118,10 @@
             // 清空当前子应用数据
             clearSubAppData: () => {
                 if (!confirm('确定清空此应用的记录吗？')) return;
-                const allData = Storage.get('wechat_search_phone_data', {});
+                const allData = AppStorage.get('wechat_search_phone_data', {});
                 if (allData[SearchPhoneUI.targetCharId]) {
                     delete allData[SearchPhoneUI.targetCharId][SearchPhoneUI.currentApp];
-                    Storage.set('wechat_search_phone_data', allData);
+                    AppStorage.set('wechat_search_phone_data', allData);
                     SearchPhoneUI.renderSubAppContent();
                     Utils.showToast('记录已粉碎');
                 }
@@ -9055,7 +9131,7 @@
             generateSubAppData: async () => {
                 const cid = SearchPhoneUI.targetCharId;
                 const appName = SearchPhoneUI.currentApp;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
 
                 Utils.showToast('正在破解数据...');
@@ -9064,7 +9140,7 @@
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
                 // 读取已有数据，用于增量生成
-                const allData = Storage.get('wechat_search_phone_data', {});
+                const allData = AppStorage.get('wechat_search_phone_data', {});
                 let existingData = (allData[cid] && allData[cid][appName]) || null;
 
                 // 构造 System Prompt
@@ -9171,7 +9247,7 @@
                         allData[cid][appName] = newData;
                     }
 
-                    Storage.set('wechat_search_phone_data', allData);
+                    AppStorage.set('wechat_search_phone_data', allData);
                     SearchPhoneUI.renderSubAppContent();
                     Utils.showToast('数据更新成功');
 
@@ -9342,7 +9418,7 @@
                         } else {
                             // 普通消息，显示头像和时间戳
                             // 构建完整的消息元素，包含头像、消息内容和时间戳
-                            const userProfile = Storage.get('wechat_user_profile', {});
+                            const userProfile = AppStorage.get('wechat_user_profile', {});
 
                             // 为每条消息选择正确的头像和位置
                             let leftAvatar = '';
@@ -9427,7 +9503,7 @@
                 chatDetail.className = "flex flex-col bg-white min-h-full";
 
                 // 获取当前角色信息
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const currentChar = chars[SearchPhoneUI.targetCharId];
 
                 // 聊天头部
@@ -9608,7 +9684,7 @@
                 const container = document.getElementById('subapp-content');
 
                 // 1. 读取数据
-                const allData = Storage.get('wechat_search_phone_data', {});
+                const allData = AppStorage.get('wechat_search_phone_data', {});
                 let appData = (allData[cid] && allData[cid][appName]) || null;
 
                 // 2. 微信专属渲染逻辑
@@ -9618,9 +9694,9 @@
                     list.className = "flex flex-col bg-white min-h-full";
 
                     // --- 2.1 构造 User 置顶项 (实时镜像) ---
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const char = chars[cid];
-                    const userProfile = Storage.get('wechat_user_profile', {});
+                    const userProfile = AppStorage.get('wechat_user_profile', {});
 
                     // 获取最近一条聊天记录
                     const lastMsgObj = char.msgs && char.msgs.length > 0 ? char.msgs[char.msgs.length - 1] : null;
@@ -9741,7 +9817,7 @@
                 if (!appData) {
                     // 如果没有数据，根据不同应用生成不同的默认内容
                     let defaultData = '';
-                    const charName = Storage.get('wechat_chars', {})[cid]?.name || '未知用户';
+                    const charName = AppStorage.get('wechat_chars', {})[cid]?.name || '未知用户';
 
                     switch (appName) {
                         case 'diary':
@@ -9782,7 +9858,7 @@
                     const newAllData = { ...allData };
                     if (!newAllData[cid]) newAllData[cid] = {};
                     newAllData[cid][appName] = defaultData;
-                    Storage.set('wechat_search_phone_data', newAllData);
+                    AppStorage.set('wechat_search_phone_data', newAllData);
 
                     // 强制重新获取数据，确保类型正确
                     const updatedData = newAllData[cid][appName];
@@ -9933,11 +10009,11 @@
             clearAllData: () => {
                 if (!confirm('确定要清空所有应用的记录吗？此操作不可恢复！')) return;
 
-                const allData = Storage.get('wechat_search_phone_data', {});
+                const allData = AppStorage.get('wechat_search_phone_data', {});
                 if (allData[SearchPhoneUI.targetCharId]) {
                     // 清空当前角色的所有数据
                     delete allData[SearchPhoneUI.targetCharId];
-                    Storage.set('wechat_search_phone_data', allData);
+                    AppStorage.set('wechat_search_phone_data', allData);
                     Utils.showToast('所有记录已清空！');
                 }
             },
@@ -10045,15 +10121,15 @@
 
             // 获取当前角色的手机配置
             getPhoneConfig: () => {
-                const phoneConfigs = Storage.get('wechat_phone_configs', {});
+                const phoneConfigs = AppStorage.get('wechat_phone_configs', {});
                 return phoneConfigs[SearchPhoneUI.targetCharId] || {};
             },
 
             // 保存当前角色的手机配置
             savePhoneConfig: (config) => {
-                const phoneConfigs = Storage.get('wechat_phone_configs', {});
+                const phoneConfigs = AppStorage.get('wechat_phone_configs', {});
                 phoneConfigs[SearchPhoneUI.targetCharId] = config;
-                Storage.set('wechat_phone_configs', phoneConfigs);
+                AppStorage.set('wechat_phone_configs', phoneConfigs);
                 // 应用配置到UI
                 SearchPhoneUI.applyPhoneConfig(config);
             },
@@ -10456,7 +10532,7 @@
 
             // --- 朋友圈设置逻辑 ---
             openMomentsSettings: () => {
-                const user = Storage.get('wechat_user_profile', {});
+                const user = AppStorage.get('wechat_user_profile', {});
                 // 1. 回显基础数据
                 document.getElementById('moments-bio-input').value = user.bio || '';
                 document.getElementById('moments-bg-input').value = user.momentsBg || '';
@@ -10464,8 +10540,8 @@
                 document.getElementById('moments-auto-interval').value = user.momentsInterval || 60;
 
                 // 2. 动态渲染好友列表 (用于清理选择)
-                const chars = Storage.get('wechat_chars', {});
-                const npcs = Storage.get('wechat_npcs', {});
+                const chars = AppStorage.get('wechat_chars', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const listDiv = document.getElementById('friends-list-for-clear');
 
                 let html = '';
@@ -10494,14 +10570,14 @@
             },
 
             saveMomentsSettings: () => {
-                const user = Storage.get('wechat_user_profile', {});
+                const user = AppStorage.get('wechat_user_profile', {});
                 // 保存数据
                 user.bio = document.getElementById('moments-bio-input').value;
                 user.momentsBg = document.getElementById('moments-bg-input').value;
                 user.momentsAuto = document.getElementById('moments-auto-switch').checked;
                 user.momentsInterval = parseInt(document.getElementById('moments-auto-interval').value);
 
-                Storage.set('wechat_user_profile', user);
+                AppStorage.set('wechat_user_profile', user);
 
                 // 立即生效
                 if (window.MomentsOS) {
@@ -10532,7 +10608,7 @@
             // 1. 点击分享按钮，打开选择弹窗
             shareMomentToChat: (momentId) => {
                 WeChatUI.tempShareId = momentId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const list = document.getElementById('share-contact-list');
 
                 list.innerHTML = Object.values(chars).map(c => `
@@ -10586,12 +10662,12 @@
 
                 if (!cid) return; // 如果没找到 ID，就不执行
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) return;
 
                 // 2. 切换状态 (如果原本是 undefined，取反就是 true)
                 chars[cid].autoTTS = !chars[cid].autoTTS;
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 3. 立即刷新图标
                 WeChatUI.updateAutoTTSIcon();
@@ -10614,7 +10690,7 @@
 
                 if (!btn || !cid) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 // 默认是关闭 (false 或 undefined)
                 const isEnabled = chars[cid] && chars[cid].autoTTS === true;
 
@@ -10741,9 +10817,9 @@
             },
             // 全局编号计数器，用于红包和转账的序号
             getNextPaymentNumber: () => {
-                let counter = parseInt(Storage.get('paymentCounter', '0'));
+                let counter = parseInt(AppStorage.get('paymentCounter', '0'));
                 counter += 1;
-                Storage.set('paymentCounter', counter.toString());
+                AppStorage.set('paymentCounter', counter.toString());
                 return counter;
             },
 
@@ -10754,15 +10830,15 @@
                 if (id === 'chat' || id === 'contacts') WeChatUI.renderList();
                 // 更新"我"界面的用户信息
                 if (id === 'me') {
-                    const userProfile = Storage.get('wechat_user_profile', {});
+                    const userProfile = AppStorage.get('wechat_user_profile', {});
 
                     // 检查当前是否有选中的角色，如果有，将角色设置中的用户名同步到用户资料
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const currentChatId = WeChatUI.currentChatId;
 
                     if (currentChatId && chars[currentChatId] && chars[currentChatId].userName) {
                         userProfile.name = chars[currentChatId].userName;
-                        Storage.set('wechat_user_profile', userProfile);
+                        AppStorage.set('wechat_user_profile', userProfile);
                     }
 
                     document.getElementById('user-name').textContent = userProfile.name || '我';
@@ -10771,7 +10847,7 @@
                     if (!userProfile.avatar) {
                         const randomAvatar = WeChatUI.getRandomAvatar();
                         userProfile.avatar = randomAvatar;
-                        Storage.set('wechat_user_profile', userProfile);
+                        AppStorage.set('wechat_user_profile', userProfile);
                         // 添加空值检查，避免TypeError
                         const userAvatarEl = document.getElementById('user-avatar');
                         if (userAvatarEl) userAvatarEl.src = randomAvatar;
@@ -10804,9 +10880,9 @@
                 if (!name) return alert('请输入名字');
                 document.getElementById('modal-create-name').classList.add('hidden');
                 WeChatUI.currentChatId = 'char_' + Date.now();
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 chars[WeChatUI.currentChatId] = { id: WeChatUI.currentChatId, name: name, avatar: WeChatUI.getRandomAvatar(), msgs: [], emojis: [], unread: 0 };
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.openCharSettings(true);
             },
 
@@ -10820,7 +10896,7 @@
                 // 每 10 秒检查一次
                 WeChatUI.activeChatTimer = setInterval(() => {
                     const now = Date.now();
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     let needSave = false;
 
                     // 1. 获取当前屏幕上正在聊的"正宫"是谁
@@ -10834,7 +10910,7 @@
 
                         // --- 核心逻辑修改：使用最后一条消息时间作为计时起点 ---
                         let lastInteractionTime;
-                        
+
                         // 获取最后一条消息的时间
                         if (char.msgs && char.msgs.length > 0) {
                             // 筛选出有效的聊天消息（排除系统消息）
@@ -10879,48 +10955,61 @@
                 if (now - lastTrigger < 60000) return; // 加锁：至少间隔1分钟 
 
                 // 1. 读取历史消息 
-                const recentMsgs = (char.msgs || []).slice(-15).map(m => {
+                const allMsgs = (char.msgs || []).filter(m => m.type !== 'system' && m.type !== 'error');
+                const recentMsgs = allMsgs.slice(-15).map(m => {
                     const roleName = m.role === 'user' ? '用户' : char.name;
-                    if (m.type === 'system' || m.type === 'error') return null;
                     const content = m.type === 'text' ? m.content : '[图片/语音]';
                     return `${roleName}: ${content}`;
-                }).filter(Boolean).join('\n');
+                }).join('\n');
+
+                // 获取最后一条消息内容（可能是用户的也可能是AI的）
+                const lastMsg = allMsgs[allMsgs.length - 1];
+                const lastMsgRole = lastMsg ? (lastMsg.role === 'user' ? '用户' : char.name) : '';
+                const lastMsgContent = lastMsg ? (lastMsg.type === 'text' ? lastMsg.content : '[图片/语音]') : '';
 
                 const minutes = Math.floor(timeGap / 60000);
 
-                // 2. Prompt 
+                // 2. Prompt - 明确要求基于最后一条消息继续话题
                 let systemInstruction = ` 
  你现在必须完全**变成**角色 "${char.name}" 本人。 
  **禁止**扮演 "AI助手"，**禁止**解释你在做什么，**禁止**输出 "好的"、"方案" 等废话。 
  直接以 "${char.name}" 的口吻给用户发一条微信。 
 
  **当前情况**: 
- 1. 你们正在聊天，但用户突然消失了 ${minutes} 分钟没有回你。 
+ 1. 你们刚才在聊天，但用户突然消失了 ${minutes} 分钟没有回你。 
  2. 你的心情：${isHidden ? '担心、疑惑（因为用户手机可能锁屏了）' : '有点吃醋、想引起注意（因为用户在线却不理你）'}。 
  3. 你的性格：${char.prompt || char.personality || '保持一贯风格'}。 
 
+ **聊天内容回顾**：
+ 最后一条消息是【${lastMsgRole}】说的："${lastMsgContent}"
+
  **绝对指令**: 
- - 仔细阅读下方的【最近聊天记录】，必须接得上刚才的话题和氛围。 
- - **允许使用括号/动作描写**（如果这是你平时聊天的习惯）。 
- - 只输出**一句**你发给用户的微信内容。 
+ - **【核心要求】你的消息必须紧接着最后一条聊天内容的话题和氛围，自然地延续对话**
+ - 如果最后一条是你（${char.name}）说的，现在用户${minutes}分钟没理你，你应该根据那条消息的内容催促/追问/抱怨/关心
+ - 如果最后一条是用户说的，你应该基于用户那句话的内容做出延续反应，表达"你怎么不回我了"的意思
+ - **不要**突然换话题或说无关的话
+ - **允许使用括号/动作描写**（如果这是你平时聊天的习惯）
+ - 只输出**一句**你发给用户的微信内容
  - 【强制】必须按照中文聊天习惯分句，每一小句话后面加上###分隔句子！
  - 【绝对强制】必须按照格式分句，每一小句话后面加上###分隔句子！
  `;
 
                 const finalPrompt = `${systemInstruction} 
 
- 【最近聊天记录】 
+ 【最近聊天记录】（供参考上下文） 
  ${recentMsgs} 
- (用户已沉默 ${minutes} 分钟...) 
+ 
+ 【重点】最后一条消息："${lastMsgRole}: ${lastMsgContent}"
+ （用户已沉默 ${minutes} 分钟...） 
 
- 【你发给用户的消息】：`;
+ 【你（${char.name}）现在要发给用户的消息】：`;
 
                 // 更新时间，防止重复触发 
                 localStorage.setItem('last_interaction_time', Date.now());
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (chars[char.id]) {
                     chars[char.id].lastActiveTrigger = Date.now();
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                 }
 
                 try {
@@ -11006,7 +11095,7 @@
 
             // Initialize default test user if empty
             checkInit: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
 
                 // Update avatar for all existing characters
                 Object.values(chars).forEach(char => {
@@ -11028,22 +11117,22 @@
                     };
                 }
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // Initialize NPCs storage if empty
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 if (Object.keys(npcs).length === 0) {
-                    Storage.set('wechat_npcs', {});
+                    AppStorage.set('wechat_npcs', {});
                 }
 
                 // Initialize moments storage if empty
-                const moments = Storage.get('wechat_moments', []);
+                const moments = AppStorage.get('wechat_moments', []);
                 if (moments.length === 0) {
-                    Storage.set('wechat_moments', []);
+                    AppStorage.set('wechat_moments', []);
                 }
 
                 // Initialize user profile if empty
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
 
                 // Update user avatar if not set or using old style
                 // 【核心修复】同样删除了针对 data:image 的重置逻辑
@@ -11058,7 +11147,7 @@
 
                 // Initialize empty profile
                 if (Object.keys(userProfile).length === 0) {
-                    Storage.set('wechat_user_profile', {
+                    AppStorage.set('wechat_user_profile', {
                         name: '我',
                         avatar: userProfile.avatar,
                         momentsBg: userProfile.momentsBg,
@@ -11066,11 +11155,11 @@
                     });
                 } else {
                     // Save updated profile with new avatar and moments bg if needed
-                    Storage.set('wechat_user_profile', userProfile);
+                    AppStorage.set('wechat_user_profile', userProfile);
                 }
 
                 // 恢复自动朗读状态
-                WeChatUI.isAutoTTS = Storage.get('wechat_auto_tts', false);
+                WeChatUI.isAutoTTS = AppStorage.get('wechat_auto_tts', false);
                 WeChatUI.updateAutoTTSIcon();
 
                 // 请求通知权限，用于后台查岗提示
@@ -11097,7 +11186,7 @@
                 const charSelect = document.getElementById('random-npc-char-select');
 
                 // Populate character options
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const charOptions = Object.values(chars).map(char => `
                     <option value="${char.id}">${char.name}</option>
                 `).join('');
@@ -11106,7 +11195,7 @@
                 modal.classList.remove('hidden');
             },
             renderNPCList: () => {
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const list = document.getElementById('npc-list');
 
                 if (Object.keys(npcs).length === 0) {
@@ -11149,7 +11238,7 @@
                 document.getElementById('modal-npc-form').classList.remove('hidden');
             },
             editNPC: (id) => {
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const npc = npcs[id];
                 if (!npc) return;
 
@@ -11165,7 +11254,7 @@
                 document.getElementById('modal-npc-form').classList.remove('hidden');
             },
             populateCharSelect: (selectedCharId = '') => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const charSelect = document.getElementById('npc-char-select');
 
                 const charOptions = Object.values(chars).map(char => `
@@ -11179,8 +11268,8 @@
 
                 if (!charId || !npcId) return alert('请先保存NPC并选择关联角色');
 
-                const chars = Storage.get('wechat_chars', {});
-                const npcs = Storage.get('wechat_npcs', {});
+                const chars = AppStorage.get('wechat_chars', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
 
                 if (!chars[charId] || !npcs[npcId]) return alert('角色或NPC不存在');
 
@@ -11188,7 +11277,7 @@
                 if (!chars[charId].boundNPCs) chars[charId].boundNPCs = [];
                 if (!chars[charId].boundNPCs.includes(npcId)) {
                     chars[charId].boundNPCs.push(npcId);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     Utils.showToast('NPC已添加到角色列表');
                 } else {
                     Utils.showToast('NPC已在角色列表中');
@@ -11203,7 +11292,7 @@
 
                 if (!name) return alert('请输入NPC名字');
 
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const npcId = id || 'npc_' + Date.now();
 
                 npcs[npcId] = {
@@ -11214,25 +11303,25 @@
                     associatedChar: charId
                 };
 
-                Storage.set('wechat_npcs', npcs);
+                AppStorage.set('wechat_npcs', npcs);
                 document.getElementById('modal-npc-form').classList.add('hidden');
                 WeChatUI.renderNPCList();
             },
             deleteNPC: (id) => {
                 if (!confirm('确定删除此NPC吗？')) return;
 
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 delete npcs[id];
-                Storage.set('wechat_npcs', npcs);
+                AppStorage.set('wechat_npcs', npcs);
 
                 // Remove this NPC from all characters' bound NPCs
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 Object.values(chars).forEach(char => {
                     if (char.boundNPCs) {
                         char.boundNPCs = char.boundNPCs.filter(npcId => npcId !== id);
                     }
                 });
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 WeChatUI.renderNPCList();
             },
@@ -11243,7 +11332,7 @@
 
                 if (!charId) return alert('请选择关联角色');
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (!char) return alert('角色不存在');
 
@@ -11281,7 +11370,7 @@
                     }
 
                     const npcList = JSON.parse(cleanJson);
-                    const npcs = Storage.get('wechat_npcs', {});
+                    const npcs = AppStorage.get('wechat_npcs', {});
                     const newNPCsIds = [];
 
                     for (const npcInfo of npcList) {
@@ -11303,11 +11392,11 @@
                         newNPCsIds.push(npcId);
                     }
 
-                    Storage.set('wechat_npcs', npcs);
+                    AppStorage.set('wechat_npcs', npcs);
 
                     if (!char.boundNPCs) char.boundNPCs = [];
                     char.boundNPCs.push(...newNPCsIds);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
 
                     document.getElementById('modal-random-npc').classList.add('hidden');
                     WeChatUI.renderNPCList();
@@ -11344,8 +11433,8 @@
                 const cid = isNew ? WeChatUI.currentChatId : document.getElementById('subpage-chat-detail').dataset.charId;
                 if (!cid) return;
                 WeChatUI.currentChatId = cid;
-                const c = Storage.get('wechat_chars', {})[cid];
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const c = AppStorage.get('wechat_chars', {})[cid];
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 document.getElementById('char-name').value = c.name;
                 WeChatUI.renderAvatarPreview('char-avatar-preview', c.avatar);
                 document.getElementById('char-avatar-data').value = c.avatar || '';
@@ -11428,9 +11517,9 @@
                 HistoryManager.push('subpage-char-settings');
             },
             renderNPCBindingList: (cid) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[cid];
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const npcList = Object.values(npcs);
                 const bindingList = document.getElementById('npc-binding-list');
 
@@ -11465,7 +11554,7 @@
                 }).join('');
             },
             toggleNPCBinding: (cid, npcId) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[cid];
                 if (!c.boundNPCs) c.boundNPCs = [];
 
@@ -11476,7 +11565,7 @@
                     c.boundNPCs.push(npcId);
                 }
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.renderNPCBindingList(cid);
             },
             saveCharacter: () => {
@@ -11484,7 +11573,7 @@
                 const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
                 const getCheck = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 if (!c) return Utils.showToast('保存失败：找不到角色ID');
 
@@ -11503,7 +11592,7 @@
                 c.userAvatar = getVal('user-avatar-data');
 
                 // 同步用户名和头像到用户资料
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 if (c.userName) {
                     userProfile.name = c.userName;
                     // 更新UI
@@ -11516,7 +11605,7 @@
                     const imgEls = ['user-avatar', 'moments-avatar', 'user-moments-avatar'];
                     imgEls.forEach(id => { if (document.getElementById(id)) document.getElementById(id).src = c.userAvatar; });
                 }
-                Storage.set('wechat_user_profile', userProfile);
+                AppStorage.set('wechat_user_profile', userProfile);
 
                 // 高级设置
                 c.contextLimit = parseInt(getVal('char-context-limit')) || 20;
@@ -11567,7 +11656,7 @@
                     SettingsLogic.generateLLM(apiMessages, WeChatUI.currentChatId).then(reply => {
                         if (reply && reply.trim()) {
                             c.msgs.push({ role: 'ai', type: 'text', content: reply.trim(), timestamp: Date.now() });
-                            Storage.set('wechat_chars', chars);
+                            AppStorage.set('wechat_chars', chars);
                             // 如果当前就在聊天页，刷新它
                             const detailEl = document.getElementById('subpage-chat-detail');
                             if (detailEl && detailEl.classList.contains('active') && detailEl.dataset.charId === WeChatUI.currentChatId) {
@@ -11578,7 +11667,7 @@
                 }
 
                 // --- 4. 保存并关闭 ---
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 Utils.showToast('角色已保存');
 
                 document.getElementById('subpage-char-settings').classList.remove('active');
@@ -11648,14 +11737,14 @@
                     newEmojis.push({ name, url, category: selectedCategory, type: emojiType });
                 });
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 let existingUrls = new Set();
                 let uniqueEmojis = [];
 
                 // Get existing emoji URLs to check for duplicates
                 if (emojiType === 'global') {
-                    let globalEmojis = Storage.get('wechat_global_emojis', []);
+                    let globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     existingUrls = new Set(globalEmojis.map(e => e.url));
                 } else {
                     if (!c.emojis) c.emojis = [];
@@ -11678,15 +11767,15 @@
 
                 if (emojiType === 'global') {
                     // Save to global emojis
-                    let globalEmojis = Storage.get('wechat_global_emojis', []);
+                    let globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     globalEmojis.push(...uniqueEmojis);
-                    Storage.set('wechat_global_emojis', globalEmojis);
+                    AppStorage.set('wechat_global_emojis', globalEmojis);
                 } else {
                     // Save to character-specific emojis
                     if (!c.emojis) c.emojis = [];
                     if (!c.emojiCategories) c.emojiCategories = ['default'];
                     c.emojis.push(...uniqueEmojis);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                 }
 
                 WeChatUI.updateEmojiCategories();
@@ -11705,7 +11794,7 @@
                         // 确保currentChatId被设置
                         if (!WeChatUI.currentChatId) {
                             // 尝试从当前页面的ID获取角色ID
-                            const charId = WeChatUI.currentChatId || document.getElementById('char-name').value || Object.keys(Storage.get('wechat_chars', {})).find(id => true);
+                            const charId = WeChatUI.currentChatId || document.getElementById('char-name').value || Object.keys(AppStorage.get('wechat_chars', {})).find(id => true);
                             if (charId) {
                                 WeChatUI.currentChatId = charId;
                             }
@@ -11722,7 +11811,7 @@
                 WeChatUI.toggleEmojiCategories();
             },
             renderEmojiCategories: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 const categories = c.emojiCategories || ['default'];
                 const list = document.getElementById('emoji-categories-list');
@@ -11746,20 +11835,20 @@
                 const name = document.getElementById('new-category-name').value.trim();
                 if (!name) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 if (!c.emojiCategories) c.emojiCategories = ['default'];
 
                 if (!c.emojiCategories.includes(name)) {
                     c.emojiCategories.push(name);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.renderEmojiCategories();
                     WeChatUI.updateEmojiCategories();
                     document.getElementById('new-category-name').value = '';
                 }
             },
             deleteEmojiCategory: (index) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 if (!c.emojiCategories || index === 0) return;
 
@@ -11773,13 +11862,13 @@
                     }
                 });
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.renderEmojiCategories();
                 WeChatUI.updateEmojiCategories();
                 WeChatUI.renderEmojiGrid(WeChatUI.getAllEmojis());
             },
             updateEmojiCategories: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 const categories = c.emojiCategories || ['default'];
                 const select = document.getElementById('emoji-category-select');
@@ -11792,7 +11881,7 @@
                 }
             },
             filterEmojisByCategory: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 const selectedCategory = document.getElementById('emoji-category-select').value;
                 const allEmojis = WeChatUI.getAllEmojis();
@@ -11819,30 +11908,30 @@
                 `).join('');
             },
             getAllEmojis: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
-                const globalEmojis = Storage.get('wechat_global_emojis', []);
+                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                 const charEmojis = c ? (c.emojis || []) : [];
                 return [...globalEmojis, ...charEmojis];
             },
             deleteEmoji: (index) => {
                 const allEmojis = WeChatUI.getAllEmojis();
-                const globalEmojis = Storage.get('wechat_global_emojis', []);
-                const chars = Storage.get('wechat_chars', {});
+                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
                 const charEmojis = c.emojis || [];
 
                 if (index < globalEmojis.length) {
                     // Delete from global emojis
                     globalEmojis.splice(index, 1);
-                    Storage.set('wechat_global_emojis', globalEmojis);
+                    AppStorage.set('wechat_global_emojis', globalEmojis);
                 } else {
                     // Delete from character emojis
                     const charIndex = index - globalEmojis.length;
                     if (charEmojis.length > charIndex) {
                         charEmojis.splice(charIndex, 1);
                         c.emojis = charEmojis;
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
                     }
                 }
 
@@ -11852,9 +11941,9 @@
             showEmojiPicker: () => {
                 const panel = document.getElementById('emoji-panel');
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[cid];
-                const globalEmojis = Storage.get('wechat_global_emojis', []);
+                const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                 const charEmojis = c.emojis || [];
                 const allEmojis = [...globalEmojis, ...charEmojis];
 
@@ -11927,7 +12016,7 @@
             openMemoryLib: () => {
                 const cid = WeChatUI.currentChatId;
                 if (!cid) return;
-                const char = Storage.get('wechat_chars', {})[cid];
+                const char = AppStorage.get('wechat_chars', {})[cid];
 
                 // 1. 找到容器
                 const container = document.getElementById('memory-lib-container');
@@ -11984,10 +12073,10 @@
             // 删除单条记忆
             deleteMemory: (cid, idx) => {
                 if (!confirm('确定删除这条记忆吗？')) return;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (chars[cid] && chars[cid].memory) {
                     chars[cid].memory.splice(idx, 1);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.openMemoryLib(); // 刷新显示
                     Utils.showToast('已删除');
                 }
@@ -12006,7 +12095,7 @@
 
             // 批量删除记忆
             batchDeleteMemory: (cid) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].memory || chars[cid].memory.length === 0) {
                     return Utils.showToast('暂无记忆可删除');
                 }
@@ -12016,7 +12105,7 @@
                 }
 
                 chars[cid].memory = [];
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.openMemoryLib(); // 刷新显示
                 Utils.showToast('已清空所有记忆');
             },
@@ -12026,7 +12115,7 @@
                 const cid = WeChatUI.currentChatId;
                 if (!cid) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char || !char.msgs || char.msgs.length === 0) {
                     Utils.showToast('没有可总结的聊天记录');
@@ -12072,7 +12161,7 @@
 
             // 生成总结 - 改进版：作为独立工具，将指定条数聊天记录发给AI大模型
             generateSummary: async (cid, startIndex = undefined, endIndex = undefined) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char || !char.msgs || char.msgs.length === 0) return;
 
@@ -12156,7 +12245,7 @@
 
             // 保存总结到记忆库
             saveSummaryToMemory: (cid, summary) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char) return;
 
@@ -12172,12 +12261,12 @@
                 };
 
                 char.memory.push(memoryItem);
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
             },
 
             // 通用记忆注入函数
             injectMemory: (cid, content, type = 'summary') => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char) return;
 
@@ -12193,13 +12282,13 @@
                 };
 
                 char.memory.push(memoryItem);
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
             },
 
             // 记忆互通功能初始化
             initMemoryLink: () => {
                 // 初始化记忆互通设置
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 // 为每个角色添加linkedMemories属性（如果不存在）
                 Object.values(chars).forEach(char => {
                     if (!char.linkedMemories) {
@@ -12209,7 +12298,7 @@
                         char.linkMemoryDepth = 5;
                     }
                 });
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 绑定记忆互通选择框事件
                 const selectBox = document.querySelector('.custom-multiselect .select-box');
@@ -12232,7 +12321,7 @@
                 const container = document.getElementById('memory-link-checkboxes-container');
                 if (!container) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const currentChar = chars[charId];
                 if (!currentChar) return;
 
@@ -12277,7 +12366,7 @@
 
             // 更新记忆链接
             updateMemoryLink: (charId, linkedCharId, isLinked) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (!char) return;
 
@@ -12295,22 +12384,22 @@
                     char.linkedMemories = char.linkedMemories.filter(id => id !== linkedCharId);
                 }
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
             },
 
             // 更新记忆链接深度
             updateMemoryLinkDepth: (charId, depth) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (char) {
                     char.linkMemoryDepth = depth;
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                 }
             },
 
             // 获取链接记忆上下文
             getLinkedMemoryContext: async (charId) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (!char || !char.linkedMemories || char.linkedMemories.length === 0) {
                     return '';
@@ -12349,7 +12438,7 @@
 
             // 检查是否需要自动总结
             checkAutoSummary: (cid) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char || !char.autoSummary) return;
 
@@ -12367,7 +12456,7 @@
                 const cid = WeChatUI.currentChatId;
                 if (!cid) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char || !char.msgs || char.msgs.length === 0) {
                     Utils.showToast('没有可导出的聊天记录');
@@ -12420,7 +12509,7 @@
                 const cid = WeChatUI.currentChatId;
                 if (!cid) return;
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
                 if (!char) return;
 
@@ -12449,7 +12538,7 @@
                 // 覆盖聊天记录（而不是合并）
                 char.msgs = importedMsgs;
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 Utils.showToast(`成功导入 ${importedMsgs.length} 条聊天记录`);
 
                 // 更新聊天界面
@@ -12473,7 +12562,7 @@
                 const opacity = document.getElementById('char-bg-opacity').value;
                 const fontSize = document.getElementById('char-bubble-size').value;
                 // 获取当前角色信息，用于显示自定义头像
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
 
                 const previewContainer = document.querySelector('.bg-preview-container');
@@ -12571,7 +12660,7 @@
                 }
 
                 // 获取用户个人资料（使用正确的存储键名）
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
 
                 if (otherImg) {
                     // 对方头像：优先使用输入框中的最新数据，然后是角色保存的数据，最后是随机头像
@@ -12596,25 +12685,25 @@
             },
 
             loadPresetsList: () => {
-                const presets = Storage.get('bubble_presets', {}); const sel = document.getElementById('bubble-preset-select');
+                const presets = AppStorage.get('bubble_presets', {}); const sel = document.getElementById('bubble-preset-select');
                 sel.innerHTML = '<option value="" disabled selected>选择预设...</option>' + Object.keys(presets).map(k => `<option value="${k}">${k}</option>`).join('');
             },
             saveBubblePreset: () => {
                 Utils.showPrompt('保存预设', '输入预设名称:', (name) => {
                     if (!name) return;
-                    const presets = Storage.get('bubble_presets', {});
+                    const presets = AppStorage.get('bubble_presets', {});
                     presets[name] = { css: document.getElementById('char-bubble-css').value, fontSize: document.getElementById('char-bubble-size').value };
-                    Storage.set('bubble_presets', presets);
+                    AppStorage.set('bubble_presets', presets);
                     WeChatUI.loadPresetsList();
                 });
             },
             loadBubblePreset: () => {
-                const name = document.getElementById('bubble-preset-select').value; const presets = Storage.get('bubble_presets', {});
+                const name = document.getElementById('bubble-preset-select').value; const presets = AppStorage.get('bubble_presets', {});
                 if (presets[name]) { document.getElementById('char-bubble-css').value = presets[name].css; document.getElementById('char-bubble-size').value = presets[name].fontSize; WeChatUI.updateBgPreview(); }
             },
             deleteBubblePreset: () => {
                 const name = document.getElementById('bubble-preset-select').value; if (!name) return;
-                const presets = Storage.get('bubble_presets', {}); delete presets[name]; Storage.set('bubble_presets', presets); WeChatUI.loadPresetsList();
+                const presets = AppStorage.get('bubble_presets', {}); delete presets[name]; AppStorage.set('bubble_presets', presets); WeChatUI.loadPresetsList();
             },
             // 切换通讯录分类的展开/收起状态
             toggleContactsCategory: (category) => {
@@ -12640,8 +12729,8 @@
                 // 初始化长按事件监听器
                 WeChatUI.initLongPress();
 
-                const chars = Storage.get('wechat_chars', {});
-                const npcs = Storage.get('wechat_npcs', {});
+                const chars = AppStorage.get('wechat_chars', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
 
                 // 获取所有角色，过滤掉已删除的角色，并按置顶状态和最后聊天时间排序 - 用于聊天列表
                 const chatChars = Object.values(chars)
@@ -12754,10 +12843,10 @@
                 document.getElementById('contacts-list-container').innerHTML = contactsHtml;
             },
             openChatDetail: (id) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (chars[id]) {
                     chars[id].unread = 0;
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                 }
                 WeChatUI.renderList();
                 WeChatUI.loadChat(id);
@@ -12767,9 +12856,9 @@
                 HistoryManager.push('subpage-chat-detail');
             },
             openNPCChat: (npcId, charId) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
-                const npcs = Storage.get('wechat_npcs', {});
+                const npcs = AppStorage.get('wechat_npcs', {});
                 const npc = npcs[npcId];
 
                 if (!char || !npc) return;
@@ -12798,9 +12887,9 @@
                     // 【新增】切换聊天时，立即刷新右上角朗读图标的状态
                     setTimeout(() => WeChatUI.updateAutoTTSIcon(), 0);
 
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const c = chars[id];
-                    const npcs = Storage.get('wechat_npcs', {});
+                    const npcs = AppStorage.get('wechat_npcs', {});
                     const npc = npcId ? npcs[npcId] : null;
 
                     if (!c) return;
@@ -12844,7 +12933,7 @@
                             dataChanged = true;
                         }
                     });
-                    if (dataChanged) Storage.set('wechat_chars', chars); // 保存补全后的数据
+                    if (dataChanged) AppStorage.set('wechat_chars', chars); // 保存补全后的数据
 
                     if (msgs.length === 0) {
                         if (c.openingLine && c.openingLine.trim()) {
@@ -12876,7 +12965,7 @@
                     const cssSelf = cssParts[1] || cssParts[0] || '';
 
                     // 获取用户个人资料（使用正确的存储键名）
-                    const userProfile = Storage.get('wechat_user_profile', {});
+                    const userProfile = AppStorage.get('wechat_user_profile', {});
 
                     const messagesHtml = currentMsgs.map((m, idx) => {
                         const originalIdx = startIdx + idx;
@@ -13102,7 +13191,7 @@
                 const opacity = document.getElementById('char-bg-opacity').value;
                 const fontSize = document.getElementById('char-bubble-size').value;
                 // 获取当前角色信息，用于显示自定义头像
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[WeChatUI.currentChatId];
 
                 const bgEl = document.getElementById('preview-chat-bg');
@@ -13178,7 +13267,7 @@
 
             // 加载更多消息
             loadMoreMessages: (id, npcId = '') => {
-                const c = Storage.get('wechat_chars', {})[id];
+                const c = AppStorage.get('wechat_chars', {})[id];
                 if (!c) return;
 
                 const displayLimit = c.displayLimit || 50;
@@ -13206,7 +13295,7 @@
                     return;
                 }
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) {
                     console.error('角色不存在');
                     return;
@@ -13288,7 +13377,7 @@
                     return;
                 }
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) {
                     console.error('角色不存在');
                     return;
@@ -13313,12 +13402,13 @@
 
                 // 生成统一的系统消息："你领取了xx的红包"
                 const sysMsg = {
+                    id: WeChatUI.generateMsgId(),
                     role: 'system',
                     type: 'system',
                     content: `你${actionText}了${chars[cid].name}的红包`,
                     timestamp: Date.now()
                 };
-                chars[cid].msgs.splice(parseInt(idx) + 1, 0, sysMsg);
+                chars[cid].msgs.push(sysMsg);
 
                 if (action === 'received') {
                     document.getElementById('rp-result-amount').textContent = amount;
@@ -13333,7 +13423,7 @@
                     modal.classList.add('hidden');
                 }
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.loadChat(cid);
             },
             processPaymentAction: (action) => {
@@ -13368,7 +13458,7 @@
                 }
 
                 // 获取chars并检查
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) {
                     console.error('角色不存在');
                     return;
@@ -13420,7 +13510,7 @@
                 }
 
                 // 5. 保存并刷新
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 document.getElementById('modal-payment-action').classList.add('hidden');
 
                 // 强制重新加载聊天界面，显示黑色系统提示条
@@ -13429,7 +13519,7 @@
 
             handleAIReceivedPayment: (cid, msg, action) => {
                 // AI 收到红包或转账时的自动处理逻辑
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) return;
 
                 // 如果没有指定action，则随机决定接受或拒绝，80% 概率接受
@@ -13461,7 +13551,7 @@
                 }
 
                 // 保存到存储
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 刷新聊天界面
                 if (document.getElementById('subpage-chat-detail').classList.contains('active') &&
@@ -13496,11 +13586,11 @@
                 const charId = modal.dataset.charId;
                 if (charId) {
                     // 导航到聊天详情页
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     if (chars[charId]) {
                         // 重置未读计数
                         chars[charId].unread = 0;
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
 
                         // 渲染列表并加载聊天
                         WeChatUI.renderList();
@@ -13513,7 +13603,7 @@
                 }
             },
             toggleVoiceText: (idx, cid, role) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].msgs || !chars[cid].msgs[idx]) return;
 
                 const msg = chars[cid].msgs[idx];
@@ -13524,7 +13614,7 @@
                 // 2. 如果正在播放，点击则停止
                 if (msg.playing) {
                     msg.playing = false;
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.loadChat(cid);
                     // 注意：这里没有写停止真实Audio的逻辑，简单处理仅停止动画
                     return;
@@ -13532,7 +13622,7 @@
 
                 // 3. 开始播放（显示动画）
                 msg.playing = true;
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.loadChat(cid);
 
                 // 计算模拟播放时长：保持与显示逻辑一致 (除以5)
@@ -13541,10 +13631,10 @@
 
                 // 定义停止播放的函数
                 const stopPlaying = () => {
-                    const currentChars = Storage.get('wechat_chars', {});
+                    const currentChars = AppStorage.get('wechat_chars', {});
                     if (currentChars[cid] && currentChars[cid].msgs[idx]) {
                         currentChars[cid].msgs[idx].playing = false;
-                        Storage.set('wechat_chars', currentChars);
+                        AppStorage.set('wechat_chars', currentChars);
                         // 只有当前还在聊天界面才刷新
                         if (document.getElementById('subpage-chat-detail').classList.contains('active')) {
                             WeChatUI.loadChat(cid);
@@ -13573,7 +13663,7 @@
             toggleVoiceMode: () => { WeChatUI.isVoiceMode = !WeChatUI.isVoiceMode; document.getElementById('btn-voice-mode').style.color = WeChatUI.isVoiceMode ? '#4ade80' : 'gray'; document.getElementById('chat-input').placeholder = WeChatUI.isVoiceMode ? '输入文字转语音...' : '发送消息...'; },
             regenerateLastReply: () => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[cid];
                 if (!c || !c.msgs) return;
 
@@ -13592,7 +13682,7 @@
 
                 // Remove all messages after last user message (including any system messages and AI replies)
                 c.msgs = c.msgs.slice(0, lastUserMsgIdx + 1); // Keep the user message
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.loadChat(cid);
 
                 // Regenerate the reply
@@ -13644,7 +13734,7 @@
                 const inputEl = document.getElementById('chat-input');
                 const text = inputEl.value;
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const c = chars[cid];
 
                 // Get generate button element
@@ -13783,7 +13873,7 @@
 
                         // 更新最后消息时间
                         c.lastMessageTime = currentTime;
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
 
                         timeContext = `${timeGapFeedback}\nCurrent Real Time: ${Utils.formatCurrentTime()} (${period})`;
                     }
@@ -13794,13 +13884,13 @@
                         const lastVoice = c.innerVoices[c.innerVoices.length - 1].content;
                         latestVoice = `\n[Last State: ${String(lastVoice).substring(0, 100)}...]\n`;
                     }
-                    const npcs = Storage.get('wechat_npcs', {});
+                    const npcs = AppStorage.get('wechat_npcs', {});
                     const boundNPCs = c.boundNPCs || [];
                     let npcInfo = boundNPCs.length > 0 ? 'Bound NPCs active.\n' : '';
 
                     // --- 世界书、记忆与表情包注入 ---
                     // 获取世界书信息
-                    const books = Storage.get('wechat_worldbooks', {});
+                    const books = AppStorage.get('wechat_worldbooks', {});
                     let worldInfo = "";
                     if (c && c.worldbookEntries) {
                         c.worldbookEntries.forEach(entryId => {
@@ -13812,7 +13902,7 @@
                             }
                         });
                     }
-                    
+
                     // 获取记忆信息
                     let memoryInfo = "";
                     if (c && c.memory && c.memory.length > 0) {
@@ -13825,10 +13915,10 @@
                         });
                         memoryInfo += "[End of History]\n";
                     }
-                    
+
                     // 获取表情包信息
                     let emojiInfo = "";
-                    const globalEmojis = Storage.get('wechat_global_emojis', []);
+                    const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     const charEmojis = c ? (c.emojis || []) : [];
                     const allEmojis = [...globalEmojis, ...charEmojis];
                     if (allEmojis.length > 0) {
@@ -13843,7 +13933,7 @@
 
                     // --- 核心 Prompt (强制心声) ---
                     // 获取朋友圈动态信息
-                    const moments = Storage.get('wechat_moments', []);
+                    const moments = AppStorage.get('wechat_moments', []);
                     let momentsInfo = '';
                     if (moments.length > 0) {
                         // 按时间排序，最新的在前
@@ -13878,13 +13968,13 @@
                     systemPrompt += "3. User: " + (c.userName || 'User') + ".\n";
                     systemPrompt += "4. Tone: Casual, separate sentences naturally. When encountering brackets (), [], {}, or <>, you must separate the sentence before and after the brackets into different sentences.\n";
                     systemPrompt += timeContext + latestVoice + "\n\n";
-                    
+
                     systemPrompt += "==================================================\n";
                     systemPrompt += "【第二部分：世界书】\n";
                     systemPrompt += "==================================================\n";
                     systemPrompt += (worldInfo || "暂无关联世界书内容\n\n");
                     systemPrompt += memoryInfo + "\n";
-                    
+
                     systemPrompt += "==================================================\n";
                     systemPrompt += "【第三部分：系统规则】\n";
                     systemPrompt += "==================================================\n";
@@ -13896,7 +13986,7 @@
                     systemPrompt += "   - 指令格式：在回复的最后单独一行输出 [SET_PAT:动作:后缀]\n";
                     systemPrompt += "   - 例如输出 [SET_PAT:亲了亲:的脸颊]，下次系统提示就会变成 \"用户亲了亲你的脸颊\"。\n";
                     systemPrompt += "3. **主动使用**：如果你想拍用户，请直接输出 [System: 拍一拍]。\n\n";
-                    
+
                     systemPrompt += "==================================================\n";
                     systemPrompt += "【第四部分：可用功能】\n";
                     systemPrompt += "==================================================\n";
@@ -14103,11 +14193,11 @@ Stay in character as "${c.name}" permanently.`;
                             const newSuffix = patMatch[2].trim();
 
                             // 更新角色数据
-                            const chars = Storage.get('wechat_chars', {});
+                            const chars = AppStorage.get('wechat_chars', {});
                             if (chars[cid]) {
                                 chars[cid].patAction = newAction;
                                 chars[cid].patSuffix = newSuffix;
-                                Storage.set('wechat_chars', chars);
+                                AppStorage.set('wechat_chars', chars);
 
                                 // 发送一条隐形系统提示告诉用户（可选）
                                 // WeChatUI.pushMessage('system', `(系统：拍一拍设置已更新为 "${newAction}" "${newSuffix}")`, 'system');
@@ -14364,12 +14454,12 @@ Stay in character as "${c.name}" permanently.`;
                             if (typeof cleanImageTags === 'function') msgContent = cleanImageTags(msgContent);
                             msgContent = parseImageUrls(msgContent);
 
-                            const chars = Storage.get('wechat_chars', {});
+                            const chars = AppStorage.get('wechat_chars', {});
                             const c = chars[targetCid];
 
                             // 3. 拦截特殊指令 (拍一拍)
                             if (/\[\s*System\s*[:：]\s*拍一拍\s*\]/i.test(msgContent)) {
-                                const userProfile = Storage.get('wechat_user_profile', {});
+                                const userProfile = AppStorage.get('wechat_user_profile', {});
                                 const myName = userProfile.name || '我';
                                 const charName = c ? (c.nickname || c.name) : '对方';
                                 const patAction = (c && c.patAction) || '拍了拍';
@@ -14400,14 +14490,14 @@ Stay in character as "${c.name}" permanently.`;
                             // 5. 识别AI领取红包指令
                             else if (String(msgContent).match(/^\[领取红包\]$/)) {
                                 // 查找最近的未领取红包消息
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const char = chars[targetCid];
                                 if (char && char.msgs) {
                                     // 查找最近的未领取红包消息
                                     const latestRedPacket = char.msgs
                                         .filter(msg => msg.type === 'redpacket' && msg.role === 'user' && !msg.status)
                                         .pop();
-                                    
+
                                     if (latestRedPacket) {
                                         // 触发红包领取逻辑
                                         WeChatUI.handleAIReceivedPayment(targetCid, latestRedPacket);
@@ -14419,14 +14509,14 @@ Stay in character as "${c.name}" permanently.`;
                             // 6. 识别AI拒绝红包指令
                             else if (String(msgContent).match(/^\[拒绝红包\]$/)) {
                                 // 查找最近的未领取红包消息
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const char = chars[targetCid];
                                 if (char && char.msgs) {
                                     // 查找最近的未领取红包消息
                                     const latestRedPacket = char.msgs
                                         .filter(msg => msg.type === 'redpacket' && msg.role === 'user' && !msg.status)
                                         .pop();
-                                    
+
                                     if (latestRedPacket) {
                                         // 直接拒绝红包
                                         WeChatUI.handleAIReceivedPayment(targetCid, latestRedPacket, 'rejected');
@@ -14438,14 +14528,14 @@ Stay in character as "${c.name}" permanently.`;
                             // 7. 识别AI收款指令
                             else if (String(msgContent).match(/^\[收款\]$/)) {
                                 // 查找最近的未收款转账消息
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const char = chars[targetCid];
                                 if (char && char.msgs) {
                                     // 查找最近的未收款转账消息
                                     const latestTransfer = char.msgs
                                         .filter(msg => msg.type === 'transfer' && msg.role === 'user' && !msg.status)
                                         .pop();
-                                    
+
                                     if (latestTransfer) {
                                         // 直接收款
                                         WeChatUI.handleAIReceivedPayment(targetCid, latestTransfer, 'received');
@@ -14457,14 +14547,14 @@ Stay in character as "${c.name}" permanently.`;
                             // 8. 识别AI拒绝收款指令
                             else if (String(msgContent).match(/^\[拒绝收款\]$/)) {
                                 // 查找最近的未收款转账消息
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const char = chars[targetCid];
                                 if (char && char.msgs) {
                                     // 查找最近的未收款转账消息
                                     const latestTransfer = char.msgs
                                         .filter(msg => msg.type === 'transfer' && msg.role === 'user' && !msg.status)
                                         .pop();
-                                    
+
                                     if (latestTransfer) {
                                         // 直接拒绝收款
                                         WeChatUI.handleAIReceivedPayment(targetCid, latestTransfer, 'rejected');
@@ -14512,7 +14602,7 @@ Stay in character as "${c.name}" permanently.`;
                                 if (window.WeChatUI) WeChatUI.isSpeaking = false;
 
                                 // 2. 显示系统提示 (视觉反馈)
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const charName = chars[targetCid] ? (chars[targetCid].nickname || chars[targetCid].name) : 'AI';
                                 WeChatUI.pushMessage('system', `🎹 ${charName} 正在演奏...`, 'system', 'system', null, targetCid);
 
@@ -14601,7 +14691,7 @@ Stay in character as "${c.name}" permanently.`;
                     return;
                 }
 
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid]) return;
                 if (!chars[cid].msgs) chars[cid].msgs = [];
 
@@ -14664,7 +14754,7 @@ Stay in character as "${c.name}" permanently.`;
                 }
 
                 // 保存数据 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 只有当我们在该角色的界面时，才立即刷新 UI 
                 if (isCurrentChat) {
@@ -14680,7 +14770,7 @@ Stay in character as "${c.name}" permanently.`;
                     let textToRead = type === 'voice' ? (msgObj.text || content) : (msgObj.content || '');
                     textToRead = textToRead.replace(/<[^>]+>/g, '').replace(/\([^)]*\)|（[^）]*）|\[.*?\]|\{.*?\}/g, '').replace(/\[图片\]|\[表情包.*?\]/g, '').trim();
                     if (textToRead) {
-                        const char = Storage.get('wechat_chars', {})[cid];
+                        const char = AppStorage.get('wechat_chars', {})[cid];
                         WeChatUI.addToTTSQueue(textToRead, char);
                     }
                 }
@@ -14691,22 +14781,22 @@ Stay in character as "${c.name}" permanently.`;
                 document.querySelectorAll('.long-press-bound').forEach(el => {
                     el.classList.remove('long-press-bound');
                 });
-                
+
                 // 选择所有聊天列表和通讯录元素
                 const chatList = document.getElementById('tab-chat');
                 const contactsList = document.getElementById('tab-contacts');
-                
+
                 let chatItems = [];
                 let contactItems = [];
-                
+
                 if (chatList) {
                     chatItems = Array.from(chatList.querySelectorAll('div[onclick]'));
                 }
-                
+
                 if (contactsList) {
                     contactItems = Array.from(contactsList.querySelectorAll('div[onclick]'));
                 }
-                
+
                 const elements = [...chatItems, ...contactItems];
                 console.log(`[bindLongPressEvents] 找到 ${elements.length} 个元素准备绑定`);
 
@@ -14748,14 +14838,14 @@ Stay in character as "${c.name}" permanently.`;
                             // 获取元素的onclick属性，提取id
                             const onClick = target.getAttribute('onclick');
                             const idMatch = onClick.match(/'([^']+)'/);
-                            
+
                             if (idMatch) {
                                 const id = idMatch[1];
                                 // 判断是聊天列表还是通讯录
                                 const listType = target.closest('#tab-chat') ? 'chat' : 'contact';
-                                
+
                                 console.log(`[触摸] 提取到的id: ${id}, listType: ${listType}`);
-                                
+
                                 // 直接调用函数，传递正确的参数
                                 try {
                                     WeChatUI.showContactMenu(mockEvent, id, listType);
@@ -14775,18 +14865,18 @@ Stay in character as "${c.name}" permanently.`;
                         console.log(`[鼠标右键] contextmenu 被触发!`);
                         e.preventDefault();
                         e.stopPropagation();
-                        
+
                         // 获取元素的onclick属性，提取id
                         const onClick = this.getAttribute('onclick');
                         const idMatch = onClick.match(/'([^']+)'/);
-                        
+
                         if (idMatch) {
                             const id = idMatch[1];
                             // 判断是聊天列表还是通讯录
                             const listType = this.closest('#tab-chat') ? 'chat' : 'contact';
-                            
+
                             console.log(`[鼠标右键] 提取到的id: ${id}, listType: ${listType}`);
-                            
+
                             // 直接调用函数，传递正确的参数
                             try {
                                 WeChatUI.showContactMenu(e, id, listType);
@@ -14911,7 +15001,7 @@ Stay in character as "${c.name}" permanently.`;
                 if (!chatDetailEl) return; // 如果不在聊天详情页面，直接返回
 
                 const cid = chatDetailEl.dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].msgs) return; // 如果角色或消息不存在，直接返回
 
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
@@ -14926,7 +15016,7 @@ Stay in character as "${c.name}" permanently.`;
                 if (!chatDetailEl) return; // 如果不在聊天详情页面，直接返回
 
                 const cid = chatDetailEl.dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].msgs) return; // 如果角色或消息不存在，直接返回
 
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
@@ -14950,7 +15040,7 @@ Stay in character as "${c.name}" permanently.`;
                         SettingsLogic.generateTTS(content, chars[cid]).then(url => {
                             // 浏览器TTS会直接播放并返回null，云端TTS返回音频URL
                             // 所以null不一定表示失败，需要根据TTS配置判断
-                            const globalTTS = Storage.get('tts_config', { engine: 'browser', minimax: {} });
+                            const globalTTS = AppStorage.get('tts_config', { engine: 'browser', minimax: {} });
                             if (globalTTS.engine === 'browser') {
                                 // 浏览器TTS已经直接播放，返回null表示成功
                                 Utils.showToast('开始朗读');
@@ -14979,7 +15069,7 @@ Stay in character as "${c.name}" permanently.`;
                 if (!chatDetailEl) return; // 如果不在聊天详情页面，直接返回
 
                 const cid = chatDetailEl.dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].msgs) return; // 如果角色或消息不存在，直接返回
 
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
@@ -15019,12 +15109,12 @@ Stay in character as "${c.name}" permanently.`;
                 if (!chatDetailEl) return; // 如果不在聊天详情页面，直接返回
 
                 const cid = chatDetailEl.dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
 
                 if (chars[cid] && chars[cid].msgs) {
                     // 【核心修改】根据 ID 过滤，绝对精准，不会删错
                     chars[cid].msgs = chars[cid].msgs.filter(m => m.id !== WeChatUI.ctxTargetMsgId);
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.loadChat(cid);
                     WeChatUI.renderList();
                 }
@@ -15035,7 +15125,7 @@ Stay in character as "${c.name}" permanently.`;
                 if (!chatDetailEl) return; // 如果不在聊天详情页面，直接返回
 
                 const cid = chatDetailEl.dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 if (!chars[cid] || !chars[cid].msgs) return; // 如果角色或消息不存在，直接返回
 
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
@@ -15045,7 +15135,7 @@ Stay in character as "${c.name}" permanently.`;
                     msg.isRecall = true;
                     msg.originalContent = msg.content;
                     msg.content = '撤回了一条消息';
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.loadChat(cid);
                 }
                 WeChatUI.hideContextMenu();
@@ -15058,7 +15148,7 @@ Stay in character as "${c.name}" permanently.`;
             // 打开编辑器
             ctxEdit: () => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
 
                 // 清空列表
@@ -15153,6 +15243,10 @@ Stay in character as "${c.name}" permanently.`;
                 // E. 新增：处理残留的心声标记
                 cleanReply = cleanReply.replace(/\[INNER_VOICE\]/gi, '').replace(/\[\/INNER_VOICE\]/gi, '').trim();
 
+                // 删除所有###分隔符
+                cleanReply = cleanReply.replace(/###/g, '').trim();
+                cleanReply = cleanReply.replace(/\s{2,}/g, ' ').trim();
+
                 // ===========================
                 // 2. 预处理 (清理系统标记)
                 // ===========================
@@ -15182,7 +15276,8 @@ Stay in character as "${c.name}" permanently.`;
                 const messageQueue = [];
 
                 // 步骤 A: 优先按 AI 显式分隔符 ### 切分
-                let segments = cleanReply.split(/###/);
+                // 支持###前后有空格
+                let segments = cleanReply.split(/\s*###\s*/);
 
                 segments.forEach(seg => {
                     seg = seg.trim();
@@ -15250,10 +15345,10 @@ Stay in character as "${c.name}" permanently.`;
 
                     // 获取当前聊天ID
                     const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const c = chars[cid];
                     // 获取所有可用的表情包
-                    const globalEmojis = Storage.get('wechat_global_emojis', []);
+                    const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     const charEmojis = c ? (c.emojis || []) : [];
                     const allEmojis = [...globalEmojis, ...charEmojis];
 
@@ -15289,10 +15384,10 @@ Stay in character as "${c.name}" permanently.`;
                         content = cleanImageTags(content);
                         // 【修复】强力拦截 AI 的拍一拍指令 (兼容各种冒号和空格)
                         if (/\[\s*System\s*[:：]\s*拍一拍\s*\]/i.test(content)) {
-                            const userProfile = Storage.get('wechat_user_profile', {});
+                            const userProfile = AppStorage.get('wechat_user_profile', {});
                             const myName = userProfile.name || '我';
                             // 确保能获取到当前角色信息 c
-                            const c = Storage.get('wechat_chars', {})[document.getElementById('subpage-chat-detail').dataset.charId];
+                            const c = AppStorage.get('wechat_chars', {})[document.getElementById('subpage-chat-detail').dataset.charId];
 
                             const patAction = (c && c.patAction) || '拍了拍';
                             const patSuffix = (c && c.patSuffix) || '的头';
@@ -15325,7 +15420,7 @@ Stay in character as "${c.name}" permanently.`;
                                 if (window.WeChatUI) WeChatUI.isSpeaking = false;
 
                                 // 2. 显示提示
-                                const chars = Storage.get('wechat_chars', {});
+                                const chars = AppStorage.get('wechat_chars', {});
                                 const charForPlay = chars[cid];
                                 WeChatUI.pushMessage('system', `🎹 ${charForPlay ? (charForPlay.nickname || charForPlay.name) : 'AI'} 正在演奏...`, 'system', 'system', null, cid);
 
@@ -15475,7 +15570,7 @@ Stay in character as "${c.name}" permanently.`;
                                         const interactionContent = match[2].trim();
 
                                         // 获取所有朋友圈动态，按时间排序（最新的在前）
-                                        const moments = Storage.get('wechat_moments', []);
+                                        const moments = AppStorage.get('wechat_moments', []);
                                         if (moments.length > 0) {
                                             // 按时间排序，最新的在前
                                             const sortedMoments = moments.sort((a, b) => b.timestamp - a.timestamp);
@@ -15587,9 +15682,9 @@ Stay in character as "${c.name}" permanently.`;
                 setTimeout(() => element.classList.remove('avatar-shake'), 500);
 
                 // 2. 获取基本信息
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 const myName = userProfile.name || '我';
                 const targetName = role === 'user' ? myName : (char.nickname || char.name);
 
@@ -15665,7 +15760,7 @@ Stay in character as "${c.name}" permanently.`;
             // 保存更改 (一次性处理所有消息块)
             confirmEditMsg: () => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
 
                 // 【核心修复】使用 ID 反查消息索引，而不是直接用索引
                 // 因为 ctxTargetMsg 可能是空的，或者因为加载更多消息后索引变了
@@ -15722,7 +15817,7 @@ Stay in character as "${c.name}" permanently.`;
                 // 使用计算出的正确索引进行替换
                 chars[cid].msgs.splice(originalMsgIdx, 1, ...newMsgs);
 
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 document.getElementById('modal-edit-msg').classList.add('hidden');
                 WeChatUI.loadChat(cid);
                 Utils.showToast('修改已保存');
@@ -15734,7 +15829,7 @@ Stay in character as "${c.name}" permanently.`;
             // 查看历史
             viewMsgHistory: () => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 // 使用 ID 查找消息，更安全
                 const msg = chars[cid].msgs.find(m => m.id === WeChatUI.ctxTargetMsgId);
 
@@ -15762,7 +15857,7 @@ Stay in character as "${c.name}" permanently.`;
             // 恢复版本
             restoreMsgVersion: (msgId, historyIdx) => {
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const msg = chars[cid].msgs.find(m => m.id === msgId);
 
                 if (msg && msg.history[historyIdx]) {
@@ -15782,7 +15877,7 @@ Stay in character as "${c.name}" permanently.`;
                     if (targetVersion.role) msg.role = targetVersion.role;
 
                     // 4. 保存
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.loadChat(cid);
 
                     // 5. 关闭弹窗
@@ -15809,12 +15904,12 @@ Stay in character as "${c.name}" permanently.`;
                 if (selectedEls.length === 0) return;
                 if (!confirm(`确定删除?`)) return;
                 const cid = document.getElementById('subpage-chat-detail').dataset.charId;
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const indicesToDelete = Array.from(selectedEls).map(el => parseInt(el.dataset.idx)).sort((a, b) => b - a);
                 indicesToDelete.forEach(idx => {
                     chars[cid].msgs.splice(idx, 1);
                 });
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
                 WeChatUI.exitMultiSelectMode();
                 WeChatUI.loadChat(cid);
             },
@@ -15827,13 +15922,13 @@ Stay in character as "${c.name}" permanently.`;
                 WeChatUI.ctxTargetContact = id;
                 WeChatUI.ctxListType = listType;
                 const menu = document.getElementById('contact-context-menu');
-                
+
                 // 确保菜单元素存在
                 if (!menu) {
                     console.error('contact-context-menu元素不存在');
                     return;
                 }
-                
+
                 console.log('[showContactMenu] 菜单元素找到，设置样式...');
 
                 // 【关键修复】强制设置菜单样式，确保可见
@@ -15846,20 +15941,20 @@ Stay in character as "${c.name}" permanently.`;
                 menu.style.width = '140px';
                 menu.style.border = '1px solid #333';
                 menu.style.padding = '8px 0';
-                
+
                 // 移除hidden类，显示菜单
                 menu.classList.remove('hidden');
                 menu.style.opacity = '1';
-                
+
                 // 计算菜单位置
                 let top = e.clientY;
                 let left = e.clientX;
                 const menuHeight = menu.offsetHeight || 100;
                 const menuWidth = menu.offsetWidth || 140;
-                
+
                 console.log(`[showContactMenu] 菜单尺寸: ${menuWidth}x${menuHeight}`);
                 console.log(`[showContactMenu] 初始位置: (${left}, ${top})`);
-                
+
                 // 确保菜单在视窗内
                 if (top + menuHeight > window.innerHeight) {
                     top = window.innerHeight - menuHeight - 10;
@@ -15869,7 +15964,7 @@ Stay in character as "${c.name}" permanently.`;
                 }
                 if (top < 0) top = 10;
                 if (left < 0) left = 10;
-                
+
                 menu.style.top = top + 'px';
                 menu.style.left = left + 'px';
 
@@ -15890,9 +15985,9 @@ Stay in character as "${c.name}" permanently.`;
                     deleteText.textContent = '删除好友';
                     newDeleteItem.onclick = WeChatUI.deleteFriend;
                 }
-                
+
                 console.log('[showContactMenu] 菜单已显示!');
-                
+
                 // 点击其他地方关闭菜单
                 const closeMenu = (e) => {
                     if (!menu.contains(e.target)) {
@@ -15903,7 +15998,7 @@ Stay in character as "${c.name}" permanently.`;
                         console.log('[showContactMenu] 菜单已关闭!');
                     }
                 };
-                
+
                 // 添加关闭菜单的点击事件监听器
                 setTimeout(() => {
                     document.addEventListener('click', closeMenu);
@@ -15913,7 +16008,7 @@ Stay in character as "${c.name}" permanently.`;
                 // 使用自定义确认弹窗
                 Utils.showConfirm('删除聊天', '确定删除该聊天吗？这将清除聊天记录并将角色从聊天列表中移除，但角色仍可在通讯录中找到。', (confirmed) => {
                     if (confirmed) {
-                        const chars = Storage.get('wechat_chars', {});
+                        const chars = AppStorage.get('wechat_chars', {});
                         const char = chars[WeChatUI.ctxTargetContact];
                         if (char) {
                             // 重置角色数据，移除聊天列表
@@ -15927,7 +16022,7 @@ Stay in character as "${c.name}" permanently.`;
                             if (char.summary) char.summary = '';
                             if (char.innerVoice) char.innerVoice = [];
                             // 保存到存储
-                            Storage.set('wechat_chars', chars);
+                            AppStorage.set('wechat_chars', chars);
                             // 重新渲染列表
                             WeChatUI.renderList();
                             Utils.showToast('聊天已删除');
@@ -15940,12 +16035,12 @@ Stay in character as "${c.name}" permanently.`;
             deleteFriend: () => {
                 // 先弹窗确认
                 if (confirm('确定删除该好友吗？这将完全删除该角色及其所有聊天记录。')) {
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     if (chars[WeChatUI.ctxTargetContact]) {
                         // 完全删除角色
                         delete chars[WeChatUI.ctxTargetContact];
                         // 保存到存储
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
                         // 重新渲染列表
                         WeChatUI.renderList();
                         Utils.showToast('好友已删除');
@@ -15956,12 +16051,12 @@ Stay in character as "${c.name}" permanently.`;
             },
 
             togglePinContact: () => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[WeChatUI.ctxTargetContact];
                 if (char) {
                     // 切换置顶状态
                     char.pinned = !char.pinned;
-                    Storage.set('wechat_chars', chars);
+                    AppStorage.set('wechat_chars', chars);
                     WeChatUI.renderList();
                     Utils.showToast(char.pinned ? '已置顶' : '已取消置顶');
                 }
@@ -15992,9 +16087,9 @@ Stay in character as "${c.name}" permanently.`;
                 if (input.files[0]) {
                     Utils.compressImage(input.files[0]).then(base64 => {
                         // 更新用户头像
-                        const userProfile = Storage.get('wechat_user_profile', {});
+                        const userProfile = AppStorage.get('wechat_user_profile', {});
                         userProfile.avatar = base64;
-                        Storage.set('wechat_user_profile', userProfile);
+                        AppStorage.set('wechat_user_profile', userProfile);
 
                         // 更新UI
                         const userAvatarEl = document.getElementById('user-avatar');
@@ -16021,9 +16116,9 @@ Stay in character as "${c.name}" permanently.`;
                 const avatarUrl = WeChatUI.getRandomAvatar();
 
                 // 更新用户头像
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 userProfile.avatar = avatarUrl;
-                Storage.set('wechat_user_profile', userProfile);
+                AppStorage.set('wechat_user_profile', userProfile);
 
                 // 更新UI
                 document.getElementById('user-avatar').src = avatarUrl;
@@ -16040,7 +16135,7 @@ Stay in character as "${c.name}" permanently.`;
 
             // 编辑用户名
             editUserName: () => {
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 // 显示内部弹窗
                 document.getElementById('edit-username-input').value = userProfile.name || '我';
                 document.getElementById('modal-edit-username').classList.remove('hidden');
@@ -16053,25 +16148,30 @@ Stay in character as "${c.name}" permanently.`;
 
             // 确认修改用户名
             confirmEditUsername: () => {
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 const newName = document.getElementById('edit-username-input').value;
 
                 if (newName && newName.trim()) {
                     const trimmedName = newName.trim();
                     userProfile.name = trimmedName;
-                    Storage.set('wechat_user_profile', userProfile);
+                    AppStorage.set('wechat_user_profile', userProfile);
 
                     // 更新UI
-                    document.getElementById('user-name').textContent = trimmedName;
-                    document.getElementById('moments-name').textContent = trimmedName;
-                    document.getElementById('user-moments-name').textContent = trimmedName;
+                    const userNameEl = document.getElementById('user-name');
+                    if (userNameEl) userNameEl.textContent = trimmedName;
+
+                    const momentsNameEl = document.getElementById('moments-name');
+                    if (momentsNameEl) momentsNameEl.textContent = trimmedName;
+
+                    const userMomentsNameEl = document.getElementById('user-moments-name');
+                    if (userMomentsNameEl) userMomentsNameEl.textContent = trimmedName;
 
                     // 同步到当前角色的设置中
-                    const chars = Storage.get('wechat_chars', {});
+                    const chars = AppStorage.get('wechat_chars', {});
                     const currentChatId = WeChatUI.currentChatId;
                     if (currentChatId && chars[currentChatId]) {
                         chars[currentChatId].userName = trimmedName;
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
                     }
 
                     // 显示提示
@@ -16086,9 +16186,9 @@ Stay in character as "${c.name}" permanently.`;
 
             // 初始化钱包
             initWallet: () => {
-                const wallet = Storage.get('wechat_wallet', null);
+                const wallet = AppStorage.get('wechat_wallet', null);
                 if (!wallet) {
-                    Storage.set('wechat_wallet', { balance: 0, transactions: [] });
+                    AppStorage.set('wechat_wallet', { balance: 0, transactions: [] });
                 }
             },
 
@@ -16106,7 +16206,7 @@ Stay in character as "${c.name}" permanently.`;
 
             // 加载钱包数据
             loadWalletData: () => {
-                const wallet = Storage.get('wechat_wallet', { balance: 0, transactions: [] });
+                const wallet = AppStorage.get('wechat_wallet', { balance: 0, transactions: [] });
 
                 // 更新余额显示
                 document.getElementById('wallet-balance').textContent = `¥${wallet.balance.toFixed(2)}`;
@@ -16177,12 +16277,12 @@ Stay in character as "${c.name}" permanently.`;
 
             // 处理同意好友申请
             acceptFriendRequest: (charId, npcId) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (!char) return;
 
                 // 获取当前用户名称
-                const userProfile = Storage.get('wechat_user_profile', {});
+                const userProfile = AppStorage.get('wechat_user_profile', {});
                 const userName = userProfile.name || '我';
 
                 // 添加同意消息（以用户身份发送）
@@ -16195,7 +16295,7 @@ Stay in character as "${c.name}" permanently.`;
                 char.msgs.push(agreeMsg);
 
                 // 保存到存储
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 重新加载聊天
                 WeChatUI.loadChat(charId, npcId);
@@ -16226,7 +16326,7 @@ Stay in character as "${c.name}" permanently.`;
                             timestamp: Date.now()
                         };
                         char.msgs.push(aiMsg);
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
                         WeChatUI.loadChat(charId, npcId);
                     }
                 });
@@ -16234,7 +16334,7 @@ Stay in character as "${c.name}" permanently.`;
 
             // 处理拒绝好友申请
             rejectFriendRequest: (charId, npcId) => {
-                const chars = Storage.get('wechat_chars', {});
+                const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[charId];
                 if (!char) return;
 
@@ -16248,7 +16348,7 @@ Stay in character as "${c.name}" permanently.`;
                 char.msgs.push(rejectMsg);
 
                 // 保存到存储
-                Storage.set('wechat_chars', chars);
+                AppStorage.set('wechat_chars', chars);
 
                 // 重新加载聊天
                 WeChatUI.loadChat(charId, npcId);
@@ -16279,7 +16379,7 @@ Stay in character as "${c.name}" permanently.`;
                             timestamp: Date.now()
                         };
                         char.msgs.push(aiMsg);
-                        Storage.set('wechat_chars', chars);
+                        AppStorage.set('wechat_chars', chars);
                         WeChatUI.loadChat(charId, npcId);
                     }
                 });
@@ -16295,7 +16395,7 @@ Stay in character as "${c.name}" permanently.`;
             },
             updateWalletBalance: (type, amount, description) => {
                 // 1. 安全读取钱包数据，如果为空则初始化
-                let wallet = Storage.get('wechat_wallet', null);
+                let wallet = AppStorage.get('wechat_wallet', null);
                 if (!wallet) {
                     wallet = { balance: 0.00, transactions: [] };
                 }
@@ -16322,7 +16422,7 @@ Stay in character as "${c.name}" permanently.`;
                 });
 
                 // 4. 保存
-                Storage.set('wechat_wallet', wallet);
+                AppStorage.set('wechat_wallet', wallet);
 
                 // 5. 如果当前开着钱包页面，实时刷新
                 if (document.getElementById('subpage-wallet').classList.contains('active')) {
@@ -16420,9 +16520,8 @@ Stay in character as "${c.name}" permanently.`;
 
         // 统一页面管理
         // 确保HistoryManager只被声明一次
-        window.HistoryManager = window.HistoryManager || {
+        window.HistoryManager = {
             push: (id) => {
-                // 推入历史，标记 level 为 subview
                 history.pushState({ level: 'subview', id: id }, '', '');
             },
             back: () => {
@@ -18038,8 +18137,8 @@ Stay in character as "${c.name}" permanently.`;
                 if (!container) return;
 
                 // 1. 检查 API 配置
-                const apiConfigs = Storage.get('api_configs', []);
-                const currentApiId = Storage.get('current_api_id', 'default');
+                const apiConfigs = AppStorage.get('api_configs', []);
+                const currentApiId = AppStorage.get('current_api_id', 'default');
                 const apiConfig = apiConfigs.find(c => c.id === currentApiId) || {};
 
                 if (!apiConfig.key || !apiConfig.url) {
@@ -18765,9 +18864,9 @@ Stay in character as "${c.name}" permanently.`;
             const fontSize = document.getElementById('char-bubble-size').value;
 
             // 2. 获取当前角色和用户信息
-            const chars = Storage.get('wechat_chars', {});
+            const chars = AppStorage.get('wechat_chars', {});
             const c = chars[WeChatUI.currentChatId];
-            const userProfile = Storage.get('wechat_user_profile', {});
+            const userProfile = AppStorage.get('wechat_user_profile', {});
 
             // 3. 处理背景图预览
             const bgEl = document.getElementById('preview-chat-bg');
@@ -18981,6 +19080,31 @@ Stay in character as "${c.name}" permanently.`;
 
 
 
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            console.log('[AntiGravity] Starting Delayed Initialization...');
+
+            // SystemLogger init
+            if (typeof SystemLogger !== 'undefined' && SystemLogger.init) {
+                try { SystemLogger.init(); console.log('SystemLogger initialized'); }
+                catch (e) { console.error('SystemLogger init failed:', e); }
+            }
+
+            // SettingsLogic init
+            if (typeof SettingsLogic !== 'undefined' && SettingsLogic.initAPI) {
+                try { SettingsLogic.initAPI(); console.log('SettingsLogic initialized'); }
+                catch (e) { console.error('SettingsLogic init failed:', e); }
+            }
+
+            // ThemeLogic init (if exists)
+            if (typeof ThemeLogic !== 'undefined' && ThemeLogic.init) {
+                try { ThemeLogic.init(); console.log('ThemeLogic initialized'); }
+                catch (e) { console.error('ThemeLogic init failed:', e); }
+            }
+
+            console.log('[AntiGravity] Initialization Complete.');
+        });
+    </script>
 </body>
 
 
