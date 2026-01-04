@@ -10329,7 +10329,6 @@ ${ivFormat}
 
                 // --- 智能解析内容 (使用统一解析器) ---
                 let contentObj = {};
-                // 如果 content 是对象，直接合并；如果是字符串，尝试解析
                 if (data.content) {
                     const parsed = InnerVoiceUI.parseVoiceData(data.content);
                     if (parsed) {
@@ -10338,23 +10337,61 @@ ${ivFormat}
                         contentObj = data.content;
                     }
                 } else {
-                    // 如果 data 本身就是扁平对象 (旧数据兼容)
                     contentObj = { ...data };
                     delete contentObj.id;
                     delete contentObj.timestamp;
                 }
 
-                // 填充到 HTML (兼容中文键名和英文键名)
-                // 优先取标准英文 key (clothes, scene, mind, action)，其次取中文 key
-                const outfit = contentObj.clothes || contentObj.着装 || contentObj.outfit || contentObj.OUTFIT || '—';
-                const scene = contentObj.scene || contentObj.环境 || contentObj.environment || contentObj.SCENE || '—';
-                const mind = contentObj.mind || contentObj.心声 || contentObj.thoughts || contentObj.THOUGHTS || '（此刻内心毫无波澜...）';
-                const action = contentObj.action || contentObj.行为 || contentObj.behavior || contentObj.ACTION || '—';
+                // 辅助格式化函数：能够处理字符串和嵌套对象
+                const formatField = (val, type) => {
+                    if (!val) return null;
+                    if (typeof val === 'string') return val;
+                    if (typeof val === 'object') {
+                        // 针对不同字段类型的特定解析策略
+                        if (type === 'outfit') {
+                            const parts = [
+                                val['上装'] || val['top'] || val['upper'],
+                                val['下装'] || val['bottom'] || val['lower'],
+                                val['鞋子'] || val['shoes'],
+                                val['配饰'] || val['accessories']
+                            ].filter(v => v && typeof v === 'string');
+                            if (parts.length > 0) return parts.join(' / ');
+                        }
+                        else if (type === 'scene') {
+                            const parts = [
+                                val['时间'] || val['time'],
+                                val['地点'] || val['location'] || val['place'],
+                                val['天气'] || val['weather']
+                            ].filter(v => v && typeof v === 'string');
+                            if (parts.length > 0) return parts.join(' · ');
+                        }
+                        else if (type === 'mind') {
+                            // 优先展示具体的想法/心声文本
+                            return val['想法'] || val['心声'] || val['thought'] || val['thinking'] || val['content'] || val['心情'] || val['mood'] || JSON.stringify(val);
+                        }
+                        else if (type === 'action') {
+                            return val['行为动作'] || val['动作'] || val['action'] || val['行为'] || val['expression'] || val['表情'] || JSON.stringify(val);
+                        }
 
-                document.getElementById('voice-outfit-text').innerText = outfit;
-                document.getElementById('voice-scene-text').innerText = scene;
-                document.getElementById('voice-thoughts-text').innerText = mind;
-                document.getElementById('voice-action-text').innerText = action;
+                        // 通用回退：尝试拼接所有字符串值
+                        const strValues = Object.values(val).filter(v => typeof v === 'string' && v.length < 50);
+                        if (strValues.length > 0) return strValues.join(' ');
+
+                        return JSON.stringify(val); // 最后的保底，显示 JSON 也不要显示 [object Object]
+                    }
+                    return String(val);
+                };
+
+                // 填充到 HTML
+                const rawOutfit = contentObj.clothes || contentObj.着装 || contentObj.outfit || contentObj.OUTFIT;
+                const rawScene = contentObj.scene || contentObj.环境 || contentObj.environment || contentObj.SCENE;
+                const rawMind = contentObj.mind || contentObj.心声 || contentObj.thoughts || contentObj.THOUGHTS || contentObj.inner_voice;
+                const rawAction = contentObj.action || contentObj.行为 || contentObj.behavior || contentObj.ACTION;
+
+                document.getElementById('voice-outfit-text').innerText = formatField(rawOutfit, 'outfit') || '—';
+                document.getElementById('voice-scene-text').innerText = formatField(rawScene, 'scene') || '—';
+                document.getElementById('voice-thoughts-text').innerText = formatField(rawMind, 'mind') || '（此刻内心毫无波澜...）';
+                document.getElementById('voice-action-text').innerText = formatField(rawAction, 'action') || '—';
             },
 
             renderHistoryList: () => {
