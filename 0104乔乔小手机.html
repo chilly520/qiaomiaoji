@@ -28620,582 +28620,579 @@ ${char.prompt || char.persona || '这是一个普通角色'}
         </div>
     </div>
 
-</body>
+    <script>
+        /* --------------------------------------------------------------
+           5️⃣ 搜索聊天记录并跳转（完整实现）
+           -------------------------------------------------------------- */
+        const SearchChat = {
+            matches: [],          // 所有匹配的气泡元素
+            curIdx: -1,          // 当前高亮索引
 
-</html>
-<script>
-    /* --------------------------------------------------------------
-       5️⃣ 搜索聊天记录并跳转（完整实现）
-       -------------------------------------------------------------- */
-    const SearchChat = {
-        matches: [],          // 所有匹配的气泡元素
-        curIdx: -1,          // 当前高亮索引
+            init() {
+                // 等待 subapp-content 渲染后再获取搜索框
+                setTimeout(() => {
+                    const input = document.getElementById('search-input');
+                    const resultBox = document.getElementById('search-results');
+                    if (!input) return; // 如果搜索框还没渲染，稍后可能需要手动触发主要渲染
 
-        init() {
-            // 等待 subapp-content 渲染后再获取搜索框
-            setTimeout(() => {
-                const input = document.getElementById('search-input');
-                const resultBox = document.getElementById('search-results');
-                if (!input) return; // 如果搜索框还没渲染，稍后可能需要手动触发主要渲染
+                    // 实时搜索
+                    input.addEventListener('input', e => {
+                        const kw = e.target.value.trim();
+                        const container = document.getElementById('search-results');
+                        if (!container) return;
 
-                // 实时搜索
-                input.addEventListener('input', e => {
-                    const kw = e.target.value.trim();
-                    const container = document.getElementById('search-results');
-                    if (!container) return;
+                        if (!kw) {
+                            container.innerHTML = '';
+                            container.classList.add('hidden');
+                            this.matches = [];
+                            return;
+                        }
+                        this.search(kw, container);
+                    });
 
-                    if (!kw) {
-                        container.innerHTML = '';
-                        container.classList.add('hidden');
-                        this.matches = [];
-                        return;
-                    }
-                    this.search(kw, container);
-                });
+                    // 回车直接跳到第一条
+                    input.addEventListener('keydown', e => {
+                        if (e.key === 'Enter' && this.matches.length) {
+                            e.preventDefault();
+                            this.jumpTo(0);
+                        }
+                    });
 
-                // 回车直接跳到第一条
-                input.addEventListener('keydown', e => {
-                    if (e.key === 'Enter' && this.matches.length) {
-                        e.preventDefault();
-                        this.jumpTo(0);
-                    }
-                });
+                    // 键盘上下切换
+                    document.addEventListener('keydown', e => {
+                        if (!this.matches.length) return;
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            const next = (this.curIdx + 1) % this.matches.length;
+                            this.jumpTo(next);
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            const prev = (this.curIdx - 1 + this.matches.length) % this.matches.length;
+                            this.jumpTo(prev);
+                        }
+                    });
+                }, 1000);
+            },
 
-                // 键盘上下切换
-                document.addEventListener('keydown', e => {
-                    if (!this.matches.length) return;
-                    if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        const next = (this.curIdx + 1) % this.matches.length;
-                        this.jumpTo(next);
-                    } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        const prev = (this.curIdx - 1 + this.matches.length) % this.matches.length;
-                        this.jumpTo(prev);
-                    }
-                });
-            }, 1000);
-        },
+            // 在当前聊天窗口中搜索关键字
+            search(keyword, resultBox) {
+                resultBox.innerHTML = '';
+                this.matches = [];
+                this.curIdx = -1;
 
-        // 在当前聊天窗口中搜索关键字
-        search(keyword, resultBox) {
-            resultBox.innerHTML = '';
-            this.matches = [];
-            this.curIdx = -1;
-
-            // 项目中聊天气泡使用 .msg-row（若实际类名不同请自行替换）
-            const bubbles = document.querySelectorAll('.msg-row');
-            bubbles.forEach(bubble => {
-                const txt = bubble.innerText || bubble.textContent;
-                if (txt && txt.includes(keyword)) {
-                    this.matches.push(bubble);
-                    const item = document.createElement('div');
-                    item.className = 'search-item flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100';
-                    const highlighted = txt.replace(
-                        new RegExp(`(${keyword})`, 'gi'),
-                        '<mark class="bg-yellow-200">$1</mark>'
-                    );
-                    item.innerHTML = `<i class="fa-solid fa-magnifying-glass text-gray-500"></i>
+                // 项目中聊天气泡使用 .msg-row（若实际类名不同请自行替换）
+                const bubbles = document.querySelectorAll('.msg-row');
+                bubbles.forEach(bubble => {
+                    const txt = bubble.innerText || bubble.textContent;
+                    if (txt && txt.includes(keyword)) {
+                        this.matches.push(bubble);
+                        const item = document.createElement('div');
+                        item.className = 'search-item flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100';
+                        const highlighted = txt.replace(
+                            new RegExp(`(${keyword})`, 'gi'),
+                            '<mark class="bg-yellow-200">$1</mark>'
+                        );
+                        item.innerHTML = `<i class="fa-solid fa-magnifying-glass text-gray-500"></i>
                                  <span class="truncate text-sm text-gray-800">${highlighted}</span>`;
-                    item.onclick = () => this.jumpTo(this.matches.length - 1);
-                    resultBox.appendChild(item);
+                        item.onclick = () => this.jumpTo(this.matches.length - 1);
+                        resultBox.appendChild(item);
+                    }
+                });
+
+                if (!this.matches.length) {
+                    resultBox.innerHTML = `<div class="p-2 text-gray-500 text-sm">未找到 “${keyword}”</div>`;
                 }
-            });
+                resultBox.classList.remove('hidden');
+            },
 
-            if (!this.matches.length) {
-                resultBox.innerHTML = `<div class="p-2 text-gray-500 text-sm">未找到 “${keyword}”</div>`;
+            // 跳转并高亮第 n 条匹配
+            jumpTo(idx) {
+                if (!this.matches[idx]) return;
+                // 清除上一次高亮
+                this.matches.forEach(b => {
+                    b.classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400', 'transition-colors', 'duration-500');
+                });
+                const target = this.matches[idx];
+                target.classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400', 'transition-colors', 'duration-500');
+
+                // 关键修复：直接调用 scrollIntoView
+                // 如果还无效，可能是父容器 overflow 问题，这里强制把 block 设为 center
+                try {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } catch (e) { /* ignore */ }
+
+                // 额外尝试：若有特定父容器 ID，可使用 scrollTop 计算
+                const chatList = document.getElementById('chat-list') || document.querySelector('.chat-container');
+                if (chatList && chatList.scrollTo) {
+                    // 简单的计算，不一定精确，作为保底
+                    // chatList.scrollTo({ top: target.offsetTop - 150, behavior: 'smooth' });
+                }
+                this.curIdx = idx;
+
+                // 2秒后自动淡出高亮
+                setTimeout(() => {
+                    target.classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
+                }, 2000);
             }
-            resultBox.classList.remove('hidden');
-        },
+        };
 
-        // 跳转并高亮第 n 条匹配
-        jumpTo(idx) {
-            if (!this.matches[idx]) return;
-            // 清除上一次高亮
-            this.matches.forEach(b => {
-                b.classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400', 'transition-colors', 'duration-500');
-            });
-            const target = this.matches[idx];
-            target.classList.add('bg-yellow-100', 'ring-2', 'ring-yellow-400', 'transition-colors', 'duration-500');
+        // 页面加载完毕后初始化搜索功能
+        document.addEventListener('DOMContentLoaded', () => SearchChat.init());
 
-            // 关键修复：直接调用 scrollIntoView
-            // 如果还无效，可能是父容器 overflow 问题，这里强制把 block 设为 center
-            try {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } catch (e) { /* ignore */ }
+        // [Fixed] Removed buggy WeChatUI.pushMessage override that was breaking payment display and persistence.
+        // The original WeChatUI.pushMessage and loadChat functions correctly handle redpackets and transfers.
 
-            // 额外尝试：若有特定父容器 ID，可使用 scrollTop 计算
-            const chatList = document.getElementById('chat-list') || document.querySelector('.chat-container');
-            if (chatList && chatList.scrollTo) {
-                // 简单的计算，不一定精确，作为保底
-                // chatList.scrollTo({ top: target.offsetTop - 150, behavior: 'smooth' });
+
+
+
+    </script>
+    <style>
+        /* 🔟 Mindscape (Inner Voice) - ORIGINAL RESTORED */
+        #inner-voice-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        #inner-voice-modal.active {
+            display: flex;
+            animation: voiceModalFadeIn 0.4s ease;
+        }
+
+        @keyframes voiceModalFadeIn {
+            from {
+                opacity: 0;
             }
-            this.curIdx = idx;
 
-            // 2秒后自动淡出高亮
-            setTimeout(() => {
-                target.classList.remove('bg-yellow-100', 'ring-2', 'ring-yellow-400');
-            }, 2000);
-        }
-    };
-
-    // 页面加载完毕后初始化搜索功能
-    document.addEventListener('DOMContentLoaded', () => SearchChat.init());
-
-    // [Fixed] Removed buggy WeChatUI.pushMessage override that was breaking payment display and persistence.
-    // The original WeChatUI.pushMessage and loadChat functions correctly handle redpackets and transfers.
-
-
-
-
-</script>
-<style>
-    /* 🔟 Mindscape (Inner Voice) - ORIGINAL RESTORED */
-    #inner-voice-modal {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(5px);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Noto Serif SC', serif;
-    }
-
-    #inner-voice-modal.active {
-        display: flex;
-        animation: voiceModalFadeIn 0.4s ease;
-    }
-
-    @keyframes voiceModalFadeIn {
-        from {
-            opacity: 0;
+            to {
+                opacity: 1;
+            }
         }
 
-        to {
-            opacity: 1;
+        .voice-modal-content {
+            width: 90%;
+            max-width: 380px;
+            max-height: 85vh;
+            height: auto;
+            background: radial-gradient(circle at 50% 0%, #2a2520 0%, #0a0a0c 85%);
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E"),
+                radial-gradient(circle at 50% 0%, #2a2520 0%, #0a0a0c 85%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.95), inset 0 0 40px rgba(0, 0, 0, 0.6);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
         }
-    }
 
-    .voice-modal-content {
-        width: 90%;
-        max-width: 380px;
-        max-height: 85vh;
-        height: auto;
-        background: radial-gradient(circle at 50% 0%, #2a2520 0%, #0a0a0c 85%);
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E"),
-            radial-gradient(circle at 50% 0%, #2a2520 0%, #0a0a0c 85%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-top: 1px solid rgba(255, 255, 255, 0.15);
-        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.95), inset 0 0 40px rgba(0, 0, 0, 0.6);
-        border-radius: 20px;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        position: relative;
-    }
+        #voice-effect-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            mix-blend-mode: screen;
+        }
 
-    #voice-effect-canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 0;
-        mix-blend-mode: screen;
-    }
+        .voice-modal-header {
+            padding: 20px 24px;
+            z-index: 10;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(10, 10, 12, 0.8);
+        }
 
-    .voice-modal-header {
-        padding: 20px 24px;
-        z-index: 10;
-        flex-shrink: 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        background: rgba(10, 10, 12, 0.8);
-    }
+        .header-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 16px;
+            letter-spacing: 6px;
+            color: #e6dcc0;
+            text-transform: uppercase;
+        }
 
-    .header-title {
-        font-family: 'Cormorant Garamond', serif;
-        font-size: 16px;
-        letter-spacing: 6px;
-        color: #e6dcc0;
-        text-transform: uppercase;
-    }
+        .voice-modal-header-btn {
+            background: transparent;
+            border: none;
+            color: #8c7e63;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-    .voice-modal-header-btn {
-        background: transparent;
-        border: none;
-        color: #8c7e63;
-        font-size: 16px;
-        cursor: pointer;
-        transition: 0.3s;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+        .voice-modal-header-btn:hover {
+            color: #e6dcc0;
+            text-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
+        }
 
-    .voice-modal-header-btn:hover {
-        color: #e6dcc0;
-        text-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
-    }
+        .voice-modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
+        }
 
-    .voice-modal-body {
-        flex: 1;
-        overflow-y: auto;
-        padding: 24px;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(212, 175, 55, 0.3) transparent;
-    }
+        .voice-modal-body::-webkit-scrollbar {
+            width: 4px;
+        }
 
-    .voice-modal-body::-webkit-scrollbar {
-        width: 4px;
-    }
+        .voice-modal-body::-webkit-scrollbar-thumb {
+            background-color: rgba(212, 175, 55, 0.3);
+            border-radius: 2px;
+        }
 
-    .voice-modal-body::-webkit-scrollbar-thumb {
-        background-color: rgba(212, 175, 55, 0.3);
-        border-radius: 2px;
-    }
+        .voice-header-group {
+            text-align: center;
+            margin-bottom: 5px;
+        }
 
-    .voice-header-group {
-        text-align: center;
-        margin-bottom: 5px;
-    }
+        .voice-char-avatar-box {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            padding: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            outline: 1px solid rgba(212, 175, 55, 0.4);
+            outline-offset: 4px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+        }
 
-    .voice-char-avatar-box {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        margin: 0 auto 12px;
-        padding: 3px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        outline: 1px solid rgba(212, 175, 55, 0.4);
-        outline-offset: 4px;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-    }
+        .voice-char-avatar-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            filter: brightness(0.9);
+        }
 
-    .voice-char-avatar-box img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: 50%;
-        filter: brightness(0.9);
-    }
+        .voice-char-name {
+            font-size: 24px;
+            color: #e6dcc0;
+            letter-spacing: 3px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        }
 
-    .voice-char-name {
-        font-size: 24px;
-        color: #e6dcc0;
-        letter-spacing: 3px;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
-    }
+        .voice-char-meta {
+            font-size: 12px;
+            color: #8c7e63;
+            letter-spacing: 2px;
+            margin-top: 6px;
+            font-family: 'Cormorant Garamond', serif;
+            font-style: italic;
+        }
 
-    .voice-char-meta {
-        font-size: 12px;
-        color: #8c7e63;
-        letter-spacing: 2px;
-        margin-top: 6px;
-        font-family: 'Cormorant Garamond', serif;
-        font-style: italic;
-    }
+        .voice-card-inner {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
 
-    .voice-card-inner {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 24px 20px;
-        text-align: center;
-        position: relative;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-    }
+        .voice-card-inner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 20px;
+            background: linear-gradient(to bottom, #d4af37, transparent);
+        }
 
-    .voice-card-inner::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 1px;
-        height: 20px;
-        background: linear-gradient(to bottom, #d4af37, transparent);
-    }
+        .voice-label-center {
+            font-size: 11px;
+            color: #8c7e63;
+            letter-spacing: 4px;
+            margin-bottom: 12px;
+            display: block;
+        }
 
-    .voice-label-center {
-        font-size: 11px;
-        color: #8c7e63;
-        letter-spacing: 4px;
-        margin-bottom: 12px;
-        display: block;
-    }
+        .voice-text-inner {
+            font-size: 15px;
+            color: #dcdcdc;
+            line-height: 1.9;
+            font-weight: 300;
+        }
 
-    .voice-text-inner {
-        font-size: 15px;
-        color: #dcdcdc;
-        line-height: 1.9;
-        font-weight: 300;
-    }
+        .voice-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
 
-    .voice-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-    }
+        .voice-info-block {
+            position: relative;
+            padding-left: 10px;
+            border-left: 2px solid rgba(255, 255, 255, 0.05);
+        }
 
-    .voice-info-block {
-        position: relative;
-        padding-left: 10px;
-        border-left: 2px solid rgba(255, 255, 255, 0.05);
-    }
+        .voice-label {
+            font-size: 10px;
+            color: #8c7e63;
+            margin-bottom: 6px;
+            letter-spacing: 2px;
+        }
 
-    .voice-label {
-        font-size: 10px;
-        color: #8c7e63;
-        margin-bottom: 6px;
-        letter-spacing: 2px;
-    }
+        .voice-text-content {
+            font-size: 13px;
+            color: #a0a0a0;
+            line-height: 1.6;
+            text-align: justify;
+            font-weight: 300;
+        }
 
-    .voice-text-content {
-        font-size: 13px;
-        color: #a0a0a0;
-        line-height: 1.6;
-        text-align: justify;
-        font-weight: 300;
-    }
+        .voice-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 12, 0.8);
+            z-index: 10;
+            flex-shrink: 0;
+        }
 
-    .voice-modal-footer {
-        padding: 16px 24px;
-        border-top: 1px solid rgba(255, 255, 255, 0.05);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(10, 10, 12, 0.8);
-        z-index: 10;
-        flex-shrink: 0;
-    }
+        .footer-count {
+            font-size: 10px;
+            color: #555;
+            letter-spacing: 2px;
+        }
 
-    .footer-count {
-        font-size: 10px;
-        color: #555;
-        letter-spacing: 2px;
-    }
+        .effect-badge {
+            font-size: 10px;
+            color: #8c7e63;
+            opacity: 0.8;
+            letter-spacing: 1px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
 
-    .effect-badge {
-        font-size: 10px;
-        color: #8c7e63;
-        opacity: 0.8;
-        letter-spacing: 1px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 4px 8px;
-        border-radius: 6px;
-        background: rgba(0, 0, 0, 0.3);
-        cursor: pointer;
-    }
+        .effect-badge:hover {
+            color: #e6dcc0;
+            border-color: #8c7e63;
+        }
 
-    .effect-badge:hover {
-        color: #e6dcc0;
-        border-color: #8c7e63;
-    }
+        .voice-history-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px;
+            border-left: 2px solid #8c7e63;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
 
-    .voice-history-card {
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 8px;
-        padding: 12px;
-        border-left: 2px solid #8c7e63;
-        margin-bottom: 10px;
-        cursor: pointer;
-    }
+        .voice-history-time {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 4px;
+            font-family: 'Cormorant Garamond', serif;
+        }
 
-    .voice-history-time {
-        font-size: 10px;
-        color: #666;
-        margin-bottom: 4px;
-        font-family: 'Cormorant Garamond', serif;
-    }
+        .voice-history-preview {
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
 
-    .voice-history-preview {
-        font-size: 12px;
-        color: #aaa;
-        line-height: 1.4;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-</style>
+    <!-- Inner Voice Modal -->
+    <div id="inner-voice-modal" onclick="if(event.target.id === 'inner-voice-modal') InnerVoiceUI.closeModal()">
+        <div class="voice-modal-content" onclick="event.stopPropagation()">
+            <canvas id="voice-effect-canvas"></canvas>
 
-<!-- Inner Voice Modal -->
-<div id="inner-voice-modal" onclick="if(event.target.id === 'inner-voice-modal') InnerVoiceUI.closeModal()">
-    <div class="voice-modal-content" onclick="event.stopPropagation()">
-        <canvas id="voice-effect-canvas"></canvas>
-
-        <div class="voice-modal-header">
-            <button onclick="InnerVoiceUI.closeModal()" class="voice-modal-header-btn"><i
-                    class="fa-solid fa-xmark"></i></button>
-            <div class="header-title">Mindscape</div>
-            <div class="flex gap-2">
-                <button onclick="InnerVoiceUI.toggleManageMode()" class="voice-modal-header-btn" title="历史记录"><i
-                        class="fa-solid fa-clock-rotate-left"></i></button>
-                <button onclick="InnerVoiceUI.deleteCurrent()" class="voice-modal-header-btn" title="删除当前"><i
-                        class="fa-solid fa-trash-can" style="font-size: 14px;"></i></button>
-            </div>
-        </div>
-
-        <div class="voice-modal-body">
-            <div id="voice-character-view">
-                <div class="voice-header-group">
-                    <div class="voice-char-avatar-box">
-                        <img id="voice-char-avatar" src="" alt="Avatar">
-                    </div>
-                    <div class="voice-char-name" id="voice-char-name">Character</div>
-                    <div class="voice-char-meta" id="voice-char-mood">Current Mood / ...</div>
+            <div class="voice-modal-header">
+                <button onclick="InnerVoiceUI.closeModal()" class="voice-modal-header-btn"><i
+                        class="fa-solid fa-xmark"></i></button>
+                <div class="header-title">Mindscape</div>
+                <div class="flex gap-2">
+                    <button onclick="InnerVoiceUI.toggleManageMode()" class="voice-modal-header-btn" title="历史记录"><i
+                            class="fa-solid fa-clock-rotate-left"></i></button>
+                    <button onclick="InnerVoiceUI.deleteCurrent()" class="voice-modal-header-btn" title="删除当前"><i
+                            class="fa-solid fa-trash-can" style="font-size: 14px;"></i></button>
                 </div>
+            </div>
 
-                <div class="voice-grid">
-                    <div class="voice-card-inner">
-                        <span class="voice-label-center">· 内 心 独 白 ·</span>
-                        <div class="voice-text-inner" id="voice-thoughts-text">...</div>
+            <div class="voice-modal-body">
+                <div id="voice-character-view">
+                    <div class="voice-header-group">
+                        <div class="voice-char-avatar-box">
+                            <img id="voice-char-avatar" src="" alt="Avatar">
+                        </div>
+                        <div class="voice-char-name" id="voice-char-name">Character</div>
+                        <div class="voice-char-meta" id="voice-char-mood">Current Mood / ...</div>
                     </div>
 
-                    <div class="voice-row mt-6">
-                        <div class="voice-info-block">
-                            <div class="voice-label">OUTFIT 穿搭</div>
-                            <div class="voice-text-content" id="voice-outfit-text">...</div>
+                    <div class="voice-grid">
+                        <div class="voice-card-inner">
+                            <span class="voice-label-center">· 内 心 独 白 ·</span>
+                            <div class="voice-text-inner" id="voice-thoughts-text">...</div>
                         </div>
-                        <div class="voice-info-block">
-                            <div class="voice-label">SCENE 环境</div>
-                            <div class="voice-text-content" id="voice-scene-text">...</div>
+
+                        <div class="voice-row mt-6">
+                            <div class="voice-info-block">
+                                <div class="voice-label">OUTFIT 穿搭</div>
+                                <div class="voice-text-content" id="voice-outfit-text">...</div>
+                            </div>
+                            <div class="voice-info-block">
+                                <div class="voice-label">SCENE 环境</div>
+                                <div class="voice-text-content" id="voice-scene-text">...</div>
+                            </div>
+                        </div>
+
+                        <div class="voice-info-block mt-6">
+                            <div class="voice-label">ACTION 姿态</div>
+                            <div class="voice-text-content" id="voice-action-text">...</div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="voice-info-block mt-6">
-                        <div class="voice-label">ACTION 姿态</div>
-                        <div class="voice-text-content" id="voice-action-text">...</div>
+                <div id="voice-history-view" class="hidden">
+                    <div id="voice-history-list" class="flex flex-col gap-2">
                     </div>
                 </div>
             </div>
 
-            <div id="voice-history-view" class="hidden">
-                <div id="voice-history-list" class="flex flex-col gap-2">
-                </div>
+            <div class="voice-modal-footer">
+                <span class="footer-count" id="voice-index-indicator">NO. --</span>
+                <div class="effect-badge" id="effect-name-badge" onclick="InnerVoiceUI.toggleEffect()">切换特效</div>
             </div>
-        </div>
-
-        <div class="voice-modal-footer">
-            <span class="footer-count" id="voice-index-indicator">NO. --</span>
-            <div class="effect-badge" id="effect-name-badge" onclick="InnerVoiceUI.toggleEffect()">切换特效</div>
         </div>
     </div>
-</div>
 
-<script>
-    // --- WalletLogic Definition (Global) ---
-    window.WalletLogic = {
-        // 获取角色钱包数据
-        getCharWalletData: function (charId) {
-            const wallets = AppStorage.get('char_wallets', {});
-            if (!wallets[charId]) {
-                wallets[charId] = {
-                    balance: 0.00,
-                    transactions: []
-                };
+    <script>
+        // --- WalletLogic Definition (Global) ---
+        window.WalletLogic = {
+            // 获取角色钱包数据
+            getCharWalletData: function (charId) {
+                const wallets = AppStorage.get('char_wallets', {});
+                if (!wallets[charId]) {
+                    wallets[charId] = {
+                        balance: 0.00,
+                        transactions: []
+                    };
+                    AppStorage.set('char_wallets', wallets);
+                }
+                return wallets[charId];
+            },
+
+            // 保存角色钱包数据
+            saveCharWalletData: function (charId, data) {
+                const wallets = AppStorage.get('char_wallets', {});
+                wallets[charId] = data;
                 AppStorage.set('char_wallets', wallets);
+            },
+
+            addTransaction: function (charId, transaction) {
+                const data = this.getCharWalletData(charId);
+                const amount = parseFloat(transaction.amount);
+
+                // Update balance based on type
+                if (transaction.type === 'income' || transaction.type === 'received') {
+                    data.balance += amount;
+                } else {
+                    data.balance -= amount;
+                }
+
+                data.transactions.unshift({
+                    id: Date.now() + Math.random().toString(36).substr(2, 9),
+                    ...transaction,
+                    timestamp: Date.now()
+                });
+
+                this.saveCharWalletData(charId, data);
             }
-            return wallets[charId];
-        },
+        };
 
-        // 保存角色钱包数据
-        saveCharWalletData: function (charId, data) {
-            const wallets = AppStorage.get('char_wallets', {});
-            wallets[charId] = data;
-            AppStorage.set('char_wallets', wallets);
-        },
-
-        addTransaction: function (charId, transaction) {
-            const data = this.getCharWalletData(charId);
-            const amount = parseFloat(transaction.amount);
-
-            // Update balance based on type
-            if (transaction.type === 'income' || transaction.type === 'received') {
-                data.balance += amount;
-            } else {
-                data.balance -= amount;
+        // --- SearchPhoneUI Share Extension (Fixed) ---
+        // 修复版：使用正确的数据源从localStorage读取
+        SearchPhoneUI.getAppDataByIndex = function (appName, index) {
+            const cid = SearchPhoneUI.targetCharId;
+            if (!cid) {
+                console.error('[分享] 未找到目标角色ID');
+                return null;
             }
 
-            data.transactions.unshift({
-                id: Date.now() + Math.random().toString(36).substr(2, 9),
-                ...transaction,
-                timestamp: Date.now()
-            });
+            const allData = AppStorage.get('wechat_search_phone_data', {});
+            const charData = allData[cid] || {};
+            const appData = charData[appName];
 
-            this.saveCharWalletData(charId, data);
-        }
-    };
+            if (!appData) {
+                console.warn(`[分享] ${appName} 数据为空`);
+                return null;
+            }
 
-    // --- SearchPhoneUI Share Extension (Fixed) ---
-    // 修复版：使用正确的数据源从localStorage读取
-    SearchPhoneUI.getAppDataByIndex = function (appName, index) {
-        const cid = SearchPhoneUI.targetCharId;
-        if (!cid) {
-            console.error('[分享] 未找到目标角色ID');
-            return null;
-        }
+            if (Array.isArray(appData)) {
+                return appData[index] || null;
+            }
+            return appData;
+        };
 
-        const allData = AppStorage.get('wechat_search_phone_data', {});
-        const charData = allData[cid] || {};
-        const appData = charData[appName];
+        SearchPhoneUI.shareItem = function (appName, index) {
+            const appData = SearchPhoneUI.getAppDataByIndex(appName, index);
+            if (!appData) {
+                Utils.showToast('没有可分享的内容');
+                return;
+            }
 
-        if (!appData) {
-            console.warn(`[分享] ${appName} 数据为空`);
-            return null;
-        }
+            // 1. 获取所有好友/聊天对象
+            const chars = AppStorage.get('wechat_chars', {});
+            const activeChars = Object.values(chars).filter(c => !c.deleted);
 
-        if (Array.isArray(appData)) {
-            return appData[index] || null;
-        }
-        return appData;
-    };
+            console.log('[分享] 找到好友数量:', activeChars.length);
 
-    SearchPhoneUI.shareItem = function (appName, index) {
-        const appData = SearchPhoneUI.getAppDataByIndex(appName, index);
-        if (!appData) {
-            Utils.showToast('没有可分享的内容');
-            return;
-        }
+            if (activeChars.length === 0) {
+                Utils.showToast('没有可分享的好友');
+                return;
+            }
 
-        // 1. 获取所有好友/聊天对象
-        const chars = AppStorage.get('wechat_chars', {});
-        const activeChars = Object.values(chars).filter(c => !c.deleted);
-
-        console.log('[分享] 找到好友数量:', activeChars.length);
-
-        if (activeChars.length === 0) {
-            Utils.showToast('没有可分享的好友');
-            return;
-        }
-
-        // 2. 生成好友列表HTML
-        const friendsListHtml = activeChars.map(c => {
-            const avatar = c.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(c.id)}`;
-            const name = (c.nickname || c.name || '未命名').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `
+            // 2. 生成好友列表HTML
+            const friendsListHtml = activeChars.map(c => {
+                const avatar = c.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(c.id)}`;
+                const name = (c.nickname || c.name || '未命名').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `
                 <div class="share-friend-item" data-cid="${c.id}" data-app="${appName}" data-index="${index}" style="display: flex; align-items: center; gap: 12px; padding: 12px; cursor: pointer; border-radius: 8px; transition: background 0.2s;">
                     <img src="${avatar}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: #e5e7eb;">
                     <div style="font-weight: 500; color: #111827;">${name}</div>
                 </div>
             `;
-        }).join('');
+            }).join('');
 
-        // 3. 构建弹窗Modal（居中显示）
-        const modalHtml = `
+            // 3. 构建弹窗Modal（居中显示）
+            const modalHtml = `
     <div id="modal-share-contact" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center;" onclick="if(event.target.id==='modal-share-contact') this.remove()">
         <div style="background: white; width: 90%; max-width: 320px; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; max-height: 70vh; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);" onclick="event.stopPropagation()">
             <div style="padding: 16px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f9fafb;">
@@ -29209,63 +29206,63 @@ ${char.prompt || char.persona || '这是一个普通角色'}
     </div>
     `;
 
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-        // 4. 绑定点击事件
-        document.querySelectorAll('.share-friend-item').forEach(item => {
-            item.onmouseover = () => item.style.background = '#f3f4f6';
-            item.onmouseout = () => item.style.background = 'transparent';
-            item.onclick = () => {
-                const cid = item.dataset.cid;
-                const app = item.dataset.app;
-                const idx = parseInt(item.dataset.index);
-                SearchPhoneUI.doShareToChat(cid, app, idx);
-            };
-        });
-    };
+            // 4. 绑定点击事件
+            document.querySelectorAll('.share-friend-item').forEach(item => {
+                item.onmouseover = () => item.style.background = '#f3f4f6';
+                item.onmouseout = () => item.style.background = 'transparent';
+                item.onclick = () => {
+                    const cid = item.dataset.cid;
+                    const app = item.dataset.app;
+                    const idx = parseInt(item.dataset.index);
+                    SearchPhoneUI.doShareToChat(cid, app, idx);
+                };
+            });
+        };
 
-    SearchPhoneUI.doShareToChat = function (cid, appName, index) {
-        // 移除 Modal
-        document.getElementById('modal-share-contact')?.remove();
+        SearchPhoneUI.doShareToChat = function (cid, appName, index) {
+            // 移除 Modal
+            document.getElementById('modal-share-contact')?.remove();
 
-        const appData = SearchPhoneUI.getAppDataByIndex(appName, index);
-        if (!appData) {
-            Utils.showToast('获取数据失败');
-            return;
-        }
-
-        // 构建卡片 HTML
-        let cardTitle = "未知分享";
-        let cardDesc = "点击查看";
-        let cardIcon = "fa-share-alt";
-
-        if (appName === 'diary') {
-            cardTitle = appData.title || "私密日记";
-            cardDesc = (appData.content || "").substring(0, 30) + "...";
-            cardIcon = "fa-book";
-        } else if (appName === 'notes') {
-            cardTitle = "备忘录: " + (appData.title || "清单");
-            cardDesc = `包含 ${appData.items?.length || 0} 个项目`;
-            cardIcon = "fa-sticky-note";
-        } else if (appName === 'footprint') {
-            cardTitle = "足迹分享";
-            // 处理足迹数据结构：可能是 {locations: [...]} 或直接是数组
-            let locationText = "";
-            if (appData.locations && Array.isArray(appData.locations)) {
-                const loc = appData.locations[index] || appData.locations[0];
-                locationText = `${loc.time || ''} @ ${loc.place || ''}`;
-            } else if (appData.time && appData.place) {
-                locationText = `${appData.time} @ ${appData.place}`;
+            const appData = SearchPhoneUI.getAppDataByIndex(appName, index);
+            if (!appData) {
+                Utils.showToast('获取数据失败');
+                return;
             }
-            cardDesc = locationText || "查看位置信息";
-            cardIcon = "fa-map-location-dot";
-        } else if (appName === 'weibo') {
-            cardTitle = "微博动态";
-            cardDesc = (appData.content || appData.text || "").substring(0, 30) + "...";
-            cardIcon = "fa-comment-dots";
-        }
 
-        const cardHtml = `
+            // 构建卡片 HTML
+            let cardTitle = "未知分享";
+            let cardDesc = "点击查看";
+            let cardIcon = "fa-share-alt";
+
+            if (appName === 'diary') {
+                cardTitle = appData.title || "私密日记";
+                cardDesc = (appData.content || "").substring(0, 30) + "...";
+                cardIcon = "fa-book";
+            } else if (appName === 'notes') {
+                cardTitle = "备忘录: " + (appData.title || "清单");
+                cardDesc = `包含 ${appData.items?.length || 0} 个项目`;
+                cardIcon = "fa-sticky-note";
+            } else if (appName === 'footprint') {
+                cardTitle = "足迹分享";
+                // 处理足迹数据结构：可能是 {locations: [...]} 或直接是数组
+                let locationText = "";
+                if (appData.locations && Array.isArray(appData.locations)) {
+                    const loc = appData.locations[index] || appData.locations[0];
+                    locationText = `${loc.time || ''} @ ${loc.place || ''}`;
+                } else if (appData.time && appData.place) {
+                    locationText = `${appData.time} @ ${appData.place}`;
+                }
+                cardDesc = locationText || "查看位置信息";
+                cardIcon = "fa-map-location-dot";
+            } else if (appName === 'weibo') {
+                cardTitle = "微博动态";
+                cardDesc = (appData.content || appData.text || "").substring(0, 30) + "...";
+                cardIcon = "fa-comment-dots";
+            }
+
+            const cardHtml = `
     <div class="shared-app-card" 
          data-app="${appName}" 
          data-index="${index}" 
@@ -29290,909 +29287,912 @@ ${char.prompt || char.persona || '这是一个普通角色'}
     </div>
     `;
 
-        // 发送给目标角色 (作为 "User" 发送)
-        SearchPhoneUI.closeSubApp();
-        WeChatUI.openChatDetail(cid);
-        setTimeout(() => {
-            const chars = AppStorage.get('wechat_chars', {});
-            if (chars[cid]) {
-                if (!chars[cid].msgs) chars[cid].msgs = [];
-                chars[cid].msgs.push({
-                    role: 'user', // 我发送的
-                    type: 'html', // 特殊类型支持 HTML
-                    content: cardHtml,
-                    timestamp: Date.now()
-                });
-                AppStorage.set('wechat_chars', chars);
-                WeChatUI.loadChat(cid); // 刷新
+            // 发送给目标角色 (作为 "User" 发送)
+            SearchPhoneUI.closeSubApp();
+            WeChatUI.openChatDetail(cid);
+            setTimeout(() => {
+                const chars = AppStorage.get('wechat_chars', {});
+                if (chars[cid]) {
+                    if (!chars[cid].msgs) chars[cid].msgs = [];
+                    chars[cid].msgs.push({
+                        role: 'user', // 我发送的
+                        type: 'html', // 特殊类型支持 HTML
+                        content: cardHtml,
+                        timestamp: Date.now()
+                    });
+                    AppStorage.set('wechat_chars', chars);
+                    WeChatUI.loadChat(cid); // 刷新
 
-                // ✅ 手动绑定卡片点击事件（innerHTML会移除onclick属性）
-                setTimeout(() => {
-                    document.querySelectorAll('.shared-app-card').forEach(card => {
-                        if (!card.dataset.bound) {
-                            card.dataset.bound = 'true';
-                            card.addEventListener('click', function () {
-                                window.handleSharedCardClick(this);
-                            });
-                            console.log('[事件绑定] 绑定卡片点击事件', card.dataset);
+                    // ✅ 手动绑定卡片点击事件（innerHTML会移除onclick属性）
+                    setTimeout(() => {
+                        document.querySelectorAll('.shared-app-card').forEach(card => {
+                            if (!card.dataset.bound) {
+                                card.dataset.bound = 'true';
+                                card.addEventListener('click', function () {
+                                    window.handleSharedCardClick(this);
+                                });
+                                console.log('[事件绑定] 绑定卡片点击事件', card.dataset);
+                            }
+                        });
+                    }, 100);
+
+                    // 滚动到底部（使用更安全的方式）
+                    setTimeout(() => {
+                        const chatContainer = document.querySelector('.chat-messages');
+                        if (chatContainer) {
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    }, 100);
+                }
+            }, 500);
+
+            Utils.showToast('已分享，即使您现在处于"沉默"状态，卡片也已送达');
+        };
+
+
+        // ✅ 全局函数：处理分享卡片点击（版本：v2025-12-28-21:55）
+        // ✅ 自动清理补丁：监听模态框关闭，自动还原样式和位置
+        setTimeout(() => {
+            const modal = document.getElementById('modal-phone-subapp');
+            if (modal) {
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                            // 如果检测到有人试图关闭它（添加 translate-y-full）
+                            if (modal.classList.contains('translate-y-full')) {
+                                // 1. 清除强制样式
+                                modal.style.position = '';
+                                modal.style.inset = '';
+                                modal.style.zIndex = '';
+                                modal.style.display = '';
+                                modal.style.transform = '';
+
+                                // 2. 隐藏（确保不占位）
+                                modal.style.display = 'none';
+                            }
                         }
                     });
-                }, 100);
-
-                // 滚动到底部（使用更安全的方式）
-                setTimeout(() => {
-                    const chatContainer = document.querySelector('.chat-messages');
-                    if (chatContainer) {
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }
-                }, 100);
-            }
-        }, 500);
-
-        Utils.showToast('已分享，即使您现在处于"沉默"状态，卡片也已送达');
-    };
-
-
-    // ✅ 全局函数：处理分享卡片点击（版本：v2025-12-28-21:55）
-    // ✅ 自动清理补丁：监听模态框关闭，自动还原样式和位置
-    setTimeout(() => {
-        const modal = document.getElementById('modal-phone-subapp');
-        if (modal) {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                        // 如果检测到有人试图关闭它（添加 translate-y-full）
-                        if (modal.classList.contains('translate-y-full')) {
-                            // 1. 清除强制样式
-                            modal.style.position = '';
-                            modal.style.inset = '';
-                            modal.style.zIndex = '';
-                            modal.style.display = '';
-                            modal.style.transform = '';
-
-                            // 2. 隐藏（确保不占位）
-                            modal.style.display = 'none';
-                        }
-                    }
                 });
-            });
-            observer.observe(modal, { attributes: true });
-        }
-    }, 2000);
+                observer.observe(modal, { attributes: true });
+            }
+        }, 2000);
 
-    // ✅ 全局函数：处理分享卡片点击（版本：v2025-12-29-00:15 终极搬家版）
-    window.handleSharedCardClick = function (cardElement) {
-        // 1. 获取参数
-        const appName = cardElement.dataset.app;
-        const index = parseInt(cardElement.dataset.index);
-        const targetCid = cardElement.dataset.targetCid;
+        // ✅ 全局函数：处理分享卡片点击（版本：v2025-12-29-00:15 终极搬家版）
+        window.handleSharedCardClick = function (cardElement) {
+            // 1. 获取参数
+            const appName = cardElement.dataset.app;
+            const index = parseInt(cardElement.dataset.index);
+            const targetCid = cardElement.dataset.targetCid;
 
-        if (!appName || isNaN(index) || !targetCid) {
-            console.error('卡片数据错误', { appName, index, targetCid });
-            Utils.showToast('卡片数据错误');
-            return;
-        }
-
-        // 2. 延迟执行，避开冲突
-        setTimeout(() => {
-            let searchPhoneModal = document.getElementById('modal-phone-subapp');
-            if (!searchPhoneModal) {
-                console.error('找不到查手机模态框');
+            if (!appName || isNaN(index) || !targetCid) {
+                console.error('卡片数据错误', { appName, index, targetCid });
+                Utils.showToast('卡片数据错误');
                 return;
             }
 
-            // 3. 搬家逻辑：将模态框移动到 body 直接子元素，脱离层级限制
-            if (searchPhoneModal.parentElement !== document.body) {
-                document.body.appendChild(searchPhoneModal);
-            }
-
-            // 4. 强制样式操作
-            searchPhoneModal.classList.remove('translate-y-full');
-            searchPhoneModal.style.position = 'fixed'; // 确保固定定位
-            searchPhoneModal.style.inset = '0'; // 全屏覆盖
-            searchPhoneModal.style.zIndex = '99999'; // 顶级层级
-            searchPhoneModal.style.display = 'flex';
-            searchPhoneModal.style.transform = 'translateY(0)'; // 强制位移归零
-
-            // 5. 初始化 UI
-            if (typeof SearchPhoneUI !== 'undefined' && SearchPhoneUI.init) {
-                SearchPhoneUI.init();
-            }
-
-            // 6. 执行内部跳转流程
+            // 2. 延迟执行，避开冲突
             setTimeout(() => {
-                SearchPhoneUI.openCharPhone(targetCid);
+                let searchPhoneModal = document.getElementById('modal-phone-subapp');
+                if (!searchPhoneModal) {
+                    console.error('找不到查手机模态框');
+                    return;
+                }
 
+                // 3. 搬家逻辑：将模态框移动到 body 直接子元素，脱离层级限制
+                if (searchPhoneModal.parentElement !== document.body) {
+                    document.body.appendChild(searchPhoneModal);
+                }
+
+                // 4. 强制样式操作
+                searchPhoneModal.classList.remove('translate-y-full');
+                searchPhoneModal.style.position = 'fixed'; // 确保固定定位
+                searchPhoneModal.style.inset = '0'; // 全屏覆盖
+                searchPhoneModal.style.zIndex = '99999'; // 顶级层级
+                searchPhoneModal.style.display = 'flex';
+                searchPhoneModal.style.transform = 'translateY(0)'; // 强制位移归零
+
+                // 5. 初始化 UI
+                if (typeof SearchPhoneUI !== 'undefined' && SearchPhoneUI.init) {
+                    SearchPhoneUI.init();
+                }
+
+                // 6. 执行内部跳转流程
                 setTimeout(() => {
-                    SearchPhoneUI.openSubApp(appName);
+                    SearchPhoneUI.openCharPhone(targetCid);
 
                     setTimeout(() => {
-                        const container = document.getElementById('subapp-content');
-                        if (container && (appName === 'diary' || appName === 'notes')) {
-                            container.dataset.diaryEntryIdx = index;
-                            SearchPhoneUI.renderSubAppContent();
-                        }
-                    }, 150);
-                }, 150);
-            }, 100);
+                        SearchPhoneUI.openSubApp(appName);
 
-        }, 10);
-    };
-
-
-    // ✅ 全局事件委托：使用捕获阶段监听卡片点击，优先于其他监听器
-    document.addEventListener('click', function (e) {
-        const card = e.target.closest('.shared-app-card');
-        if (card) {
-            console.log('[全局委托-捕获] 检测到卡片点击', card);
-            e.stopPropagation();
-            e.preventDefault();
-            window.handleSharedCardClick(card);
-        }
-    }, true); // ← 使用捕获阶段（true），优先处理
-
-
-    // ========== 结束：分享卡片点击处理 ==========
-
-
-    // [New] Hidden System Message for Call Signaling
-    WeChatUI.sendHiddenSystemMessage = async function (charId, prompt, callback) {
-        console.log('[WeChatUI] Sending hidden system message:', prompt);
-        const chars = AppStorage.get('wechat_chars', {});
-        const char = chars[charId];
-        if (!char) return;
-
-        // Construct context using existing history
-        // Construct context using existing history
-        const historyLimit = 20;
-        const msgs = (char.msgs || []).slice(-historyLimit);
-
-        // 1. Placeholder System Message (For Persona Injection)
-        let apiMessages = [{ role: 'system', content: '' }];
-
-        // 2. History Messages
-        const historyApiMsgs = msgs.map(m => ({
-            role: m.role === 'user' ? 'user' : 'assistant',
-            content: typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? JSON.stringify(m.content) : String(m.content))
-        }));
-        apiMessages = apiMessages.concat(historyApiMsgs);
-
-        // 3. Signaling Prompt
-        apiMessages.push({ role: 'system', content: prompt });
-
-        try {
-            const reply = await SettingsLogic.generateLLM(apiMessages, charId, 'call_signal');
-            if (callback && reply) callback(reply.trim());
-        } catch (e) {
-            console.error('Hidden message failed', e);
-        }
-    };
-
-    // =========================================================================
-    // 📞 CallLogic - WeChat Voice/Video Call Implementation (Enhanced)
-    // =========================================================================
-    const CallLogic = {
-        state: 'IDLE', // IDLE, OUTGOING, INCOMING, CONNECTED
-        callType: 'audio', // audio, video
-        charId: null,
-        recognition: null,
-        isMuted: false,
-        startTime: 0,
-        timerInterval: null,
-
-        // --- Initialization ---
-        init() {
-            // Setup STT
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                this.recognition = new SpeechRecognition();
-                if (this.recognition) {
-                    this.recognition.continuous = true;
-                    this.recognition.interimResults = true;
-                    this.recognition.lang = 'zh-CN'; // Default Chinese
-
-                    const micIcon = document.getElementById('icon-mic');
-                    this.recognition.onstart = () => {
-                        console.log('[Recognition] Started');
-                        if (micIcon) {
-                            micIcon.classList.add('text-green-400', 'animate-pulse');
-                        }
-                    };
-                    this.recognition.onend = () => {
-                        console.log('[Recognition] Ended');
-                        if (micIcon) {
-                            micIcon.classList.remove('text-green-400', 'animate-pulse');
-                        }
-                        if (this.isActive) this.recognition.start();
-                    };
-                    this.recognition.onerror = (e) => console.error('[Recognition] Error:', e);
-                    this.recognition.onresult = (e) => {
-                        let interim = '';
-                        for (let i = e.resultIndex; i < e.results.length; ++i) {
-                            if (e.results[i].isFinal) {
-                                this.handleUserSpeech(e.results[i][0].transcript);
-                            } else {
-                                interim += e.results[i][0].transcript;
+                        setTimeout(() => {
+                            const container = document.getElementById('subapp-content');
+                            if (container && (appName === 'diary' || appName === 'notes')) {
+                                container.dataset.diaryEntryIdx = index;
+                                SearchPhoneUI.renderSubAppContent();
                             }
-                        }
-                        const sttPreview = document.getElementById('call-stt-preview');
-                        if (sttPreview) sttPreview.textContent = interim;
-                    };
-                }
-            } else {
-                console.warn('Browser does not support Speech Recognition');
+                        }, 150);
+                    }, 150);
+                }, 100);
+
+            }, 10);
+        };
+
+
+        // ✅ 全局事件委托：使用捕获阶段监听卡片点击，优先于其他监听器
+        document.addEventListener('click', function (e) {
+            const card = e.target.closest('.shared-app-card');
+            if (card) {
+                console.log('[全局委托-捕获] 检测到卡片点击', card);
+                e.stopPropagation();
+                e.preventDefault();
+                window.handleSharedCardClick(card);
             }
-        },
+        }, true); // ← 使用捕获阶段（true），优先处理
 
-        // --- Outgoing Call (User -> AI) ---
-        startCall(cid, type) {
-            this.charId = cid;
-            this.callType = type;
-            this.state = 'OUTGOING';
-            this.initiator = 'user'; // Track initiator
 
-            const subEl = document.getElementById('call-ai-subtitle');
-            if (subEl) subEl.textContent = '';
+        // ========== 结束：分享卡片点击处理 ==========
 
+
+        // [New] Hidden System Message for Call Signaling
+        WeChatUI.sendHiddenSystemMessage = async function (charId, prompt, callback) {
+            console.log('[WeChatUI] Sending hidden system message:', prompt);
             const chars = AppStorage.get('wechat_chars', {});
-            const char = chars[cid];
+            const char = chars[charId];
             if (!char) return;
 
-            // UI Setup
-            this.showOverlay(char, 'outgoing');
-            this.playRingtone('outgoing');
+            // Construct context using existing history
+            // Construct context using existing history
+            const historyLimit = 20;
+            const msgs = (char.msgs || []).slice(-historyLimit);
 
-            // Logic: Send System Prompt to AI
-            setTimeout(() => {
-                const prompt = `[System: User is initiating a ${type} call. Do you accept? Reply with SHORT text (e.g. "喂？") to accept, or start with [REJECT] to decline. Do NOT continue roleplay yet.]`;
-
-                // We use a helper to send hidden message
-                WeChatUI.sendHiddenSystemMessage(cid, prompt, (replyText) => {
-                    if (replyText.includes('[REJECT]')) {
-                        this.handleRemoteReject(replyText);
-                    } else {
-                        this.handleRemoteAccept(replyText);
-                    }
-                });
-            }, 500);
-        },
-
-        // --- Incoming Call (AI -> User) ---
-        startIncomingCall(cid, type) {
-            this.charId = cid;
-            this.callType = type;
-            this.state = 'INCOMING';
-            this.initiator = 'ai'; // Track initiator
-
-            const subEl = document.getElementById('call-ai-subtitle');
-            if (subEl) subEl.textContent = '';
-
-            const chars = AppStorage.get('wechat_chars', {});
-            const char = chars[cid];
-            if (!char) return;
-
-            this.showOverlay(char, 'incoming');
-            this.playRingtone('incoming');
-        },
-
-        // --- Actions ---
-        acceptCall() {
-            this.state = 'CONNECTED';
-            console.log('[CallLogic] Call accepted');
-            this.stopRingtone();
-            this.updateLayout('connected');
-            this.startTimer();
-            if (this.callType === 'video') this.startVideo();
-            this.startListening();
-
-            // Notify AI we accepted
-            WeChatUI.sendHiddenSystemMessage(this.charId, '[System: User accepted the call.]', (reply) => {
-                this.speakAI(reply);
-            });
-        },
-
-        rejectCall() {
-            console.log('[CallLogic] User rejected call');
-            this.stopRingtone();
-            this.hideOverlay();
-            WeChatUI.sendHiddenSystemMessage(this.charId, '[System: User rejected the call.]');
-            this.reset();
-        },
-
-        endCall() {
-            const duration = this.getDurationStr();
-            console.log(`[CallLogic] Ending call. Duration: ${duration}`);
-            this.stopRingtone();
-            this.stopListening();
-            this.stopVideo();
-            this.hideOverlay();
-
-            // Insert Summary Card (initiator's perspective)
-            if (this.charId) {
-                const typeText = this.callType === 'video' ? '视频通话' : '语音通话';
-                const summary = `[${typeText}] 通话时长 ${duration}`;
-                // 发起人视角：如果是用户发起的，role为user；如果是AI发起的，role为ai
-                const msgRole = this.initiator === 'user' ? 'user' : 'ai';
-
-                console.log(`[CallLogic] Logging call. Initiator: ${this.initiator}, Role: ${msgRole}`);
-                WeChatUI.pushMessage('call_log', summary, msgRole, null, null, this.charId);
-            }
-            this.reset();
-        },
-
-        handleRemoteAccept(firstReply) {
-            this.state = 'CONNECTED';
-            console.log('[CallLogic] Remote accepted call');
-            this.stopRingtone();
-            this.updateLayout('connected');
-            this.startTimer();
-            if (this.callType === 'video') this.startVideo();
-            this.startListening();
-            this.speakAI(firstReply);
-        },
-
-        handleRemoteReject(reason) {
-            console.log('[CallLogic] Remote rejected call. Reason:', reason);
-            document.getElementById('call-status').textContent = "对方忙线中";
-            setTimeout(() => {
-                this.hideOverlay();
-                const cleanReason = reason.replace(/\[REJECT\]/g, '').trim();
-                WeChatUI.pushMessage('text', cleanReason, 'assistant', null, null, this.charId);
-                this.reset();
-            }, 2000);
-        },
-
-        handleUserSpeech(text) {
-            if (!text || this.state !== 'CONNECTED') return;
-            console.log('[CallLogic] User STT:', text);
-            document.getElementById('call-stt-preview').textContent = text;
-
-            // 1. Push user voice message as HIDDEN (to keep context without cluttering UI)
-            WeChatUI.pushMessage('voice', text, 'user', null, null, this.charId, { hidden: true });
-
-            // 2. Trigger AI Response
-            const chars = AppStorage.get('wechat_chars', {});
-            const char = chars[this.charId];
-            if (!char) return;
-
-            const msgs = (char.msgs || []).slice(-30); // Use 30 messages for more context during call
+            // 1. Placeholder System Message (For Persona Injection)
             let apiMessages = [{ role: 'system', content: '' }];
 
+            // 2. History Messages
             const historyApiMsgs = msgs.map(m => ({
                 role: m.role === 'user' ? 'user' : 'assistant',
                 content: typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? JSON.stringify(m.content) : String(m.content))
             }));
-
-            // Add extra emphasis to the voice constraint in the current turn
-            if (historyApiMsgs.length > 0 && historyApiMsgs[historyApiMsgs.length - 1].role === 'user') {
-                historyApiMsgs[historyApiMsgs.length - 1].content += "\n(System: Remember, we are in a voice call. Spoken words only.)";
-            }
             apiMessages = apiMessages.concat(historyApiMsgs);
 
-            SettingsLogic.generateLLM(apiMessages, this.charId, 'call_signal').then(reply => {
-                if (reply) {
-                    let cleanReply = reply.replace(/###/g, '')
-                        .replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '')
-                        .replace(/\[表情包.*?\]/g, '')
-                        .replace(/\{[\s\S]*?\}/g, '')
-                        .replace(/<[^>]*>/g, '')
-                        .replace(/\*.*?\*/g, '')
-                        .trim();
+            // 3. Signaling Prompt
+            apiMessages.push({ role: 'system', content: prompt });
 
-                    this.speakAI(cleanReply);
-                    // Push AI reply as HIDDEN too? No, usually you want to see the AI's "last words" if they were important
-                    // But for voice calls, maybe just summary is enough. 
-                    // However, we push to history for context.
-                    WeChatUI.pushMessage('text', cleanReply, 'assistant', null, null, this.charId, { hidden: true });
-                }
-            });
-        },
+            try {
+                const reply = await SettingsLogic.generateLLM(apiMessages, charId, 'call_signal');
+                if (callback && reply) callback(reply.trim());
+            } catch (e) {
+                console.error('Hidden message failed', e);
+            }
+        };
 
-        // Called by WeChatUI when AI replies during call
-        onAIResponse(text, msgObject) {
-            if (this.state !== 'CONNECTED') return;
+        // =========================================================================
+        // 📞 CallLogic - WeChat Voice/Video Call Implementation (Enhanced)
+        // =========================================================================
+        const CallLogic = {
+            state: 'IDLE', // IDLE, OUTGOING, INCOMING, CONNECTED
+            callType: 'audio', // audio, video
+            charId: null,
+            recognition: null,
+            isMuted: false,
+            startTime: 0,
+            timerInterval: null,
 
-            const subtitleEl = document.getElementById('call-ai-subtitle');
+            // --- Initialization ---
+            init() {
+                // Setup STT
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    if (this.recognition) {
+                        this.recognition.continuous = true;
+                        this.recognition.interimResults = true;
+                        this.recognition.lang = 'zh-CN'; // Default Chinese
 
-            // 【修复】清理字幕文本 (去除 HTML 标签、Inner Voice、JSON 和 ###)
-            let cleanText = text.replace(/###/g, '')
-                .replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '')
-                .replace(/\[INNER_VOICE\][\s\S]*?(\n|$)/gi, '')
-                .replace(/\[\/INNER_VOICE\]/gi, '')
-                .replace(/\[表情包.*?\]/g, '')
-                .replace(/\{[\s\S]*?\}/g, '')
-                .replace(/<[^>]*>/g, '')
-                .replace(/\*.*?\*/g, '')
-                .trim();
-
-            cleanText = cleanText.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-
-            // 如果文本过长，不再截断，而是使用滚动框
-            // if (cleanText.length > 60) ... REMOVED
-
-            subtitleEl.textContent = cleanText;
-            subtitleEl.classList.remove('opacity-0', 'translate-y-4');
-
-            // 【UI 优化】滚动式字幕框
-            subtitleEl.style.maxHeight = '140px';
-            subtitleEl.style.overflowY = 'auto';
-            subtitleEl.style.whiteSpace = 'pre-wrap';
-            subtitleEl.style.pointerEvents = 'auto';
-            subtitleEl.style.background = 'rgba(0,0,0,0.3)'; // 半透明背景方便阅读
-            subtitleEl.style.padding = '10px';
-            subtitleEl.style.borderRadius = '8px';
-
-            // TTS
-            if (window.SettingsLogic && SettingsLogic.generateTTS) {
-                const chars = AppStorage.get('wechat_chars', {});
-                SettingsLogic.generateTTS(text, chars[this.charId]).then(url => {
-                    if (url) {
-                        const audio = new Audio(url);
-                        audio.play();
-                        document.getElementById('call-avatar-ripple').classList.remove('hidden');
-                        audio.onended = () => {
-                            document.getElementById('call-avatar-ripple').classList.add('hidden');
-                            setTimeout(() => {
-                                subtitleEl.classList.add('opacity-0', 'translate-y-4');
-                            }, 2000);
+                        const micIcon = document.getElementById('icon-mic');
+                        this.recognition.onstart = () => {
+                            console.log('[Recognition] Started');
+                            if (micIcon) {
+                                micIcon.classList.add('text-green-400', 'animate-pulse');
+                            }
+                        };
+                        this.recognition.onend = () => {
+                            console.log('[Recognition] Ended');
+                            if (micIcon) {
+                                micIcon.classList.remove('text-green-400', 'animate-pulse');
+                            }
+                            if (this.isActive) this.recognition.start();
+                        };
+                        this.recognition.onerror = (e) => console.error('[Recognition] Error:', e);
+                        this.recognition.onresult = (e) => {
+                            let interim = '';
+                            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                                if (e.results[i].isFinal) {
+                                    this.handleUserSpeech(e.results[i][0].transcript);
+                                } else {
+                                    interim += e.results[i][0].transcript;
+                                }
+                            }
+                            const sttPreview = document.getElementById('call-stt-preview');
+                            if (sttPreview) sttPreview.textContent = interim;
                         };
                     }
+                } else {
+                    console.warn('Browser does not support Speech Recognition');
+                }
+            },
+
+            // --- Outgoing Call (User -> AI) ---
+            startCall(cid, type) {
+                this.charId = cid;
+                this.callType = type;
+                this.state = 'OUTGOING';
+                this.initiator = 'user'; // Track initiator
+
+                const subEl = document.getElementById('call-ai-subtitle');
+                if (subEl) subEl.textContent = '';
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+                if (!char) return;
+
+                // UI Setup
+                this.showOverlay(char, 'outgoing');
+                this.playRingtone('outgoing');
+
+                // Logic: Send System Prompt to AI
+                setTimeout(() => {
+                    const prompt = `[System: User is initiating a ${type} call. Do you accept? Reply with SHORT text (e.g. "喂？") to accept, or start with [REJECT] to decline. Do NOT continue roleplay yet.]`;
+
+                    // We use a helper to send hidden message
+                    WeChatUI.sendHiddenSystemMessage(cid, prompt, (replyText) => {
+                        if (replyText.includes('[REJECT]')) {
+                            this.handleRemoteReject(replyText);
+                        } else {
+                            this.handleRemoteAccept(replyText);
+                        }
+                    });
+                }, 500);
+            },
+
+            // --- Incoming Call (AI -> User) ---
+            startIncomingCall(cid, type) {
+                this.charId = cid;
+                this.callType = type;
+                this.state = 'INCOMING';
+                this.initiator = 'ai'; // Track initiator
+
+                const subEl = document.getElementById('call-ai-subtitle');
+                if (subEl) subEl.textContent = '';
+
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[cid];
+                if (!char) return;
+
+                this.showOverlay(char, 'incoming');
+                this.playRingtone('incoming');
+            },
+
+            // --- Actions ---
+            acceptCall() {
+                this.state = 'CONNECTED';
+                console.log('[CallLogic] Call accepted');
+                this.stopRingtone();
+                this.updateLayout('connected');
+                this.startTimer();
+                if (this.callType === 'video') this.startVideo();
+                this.startListening();
+
+                // Notify AI we accepted
+                WeChatUI.sendHiddenSystemMessage(this.charId, '[System: User accepted the call.]', (reply) => {
+                    this.speakAI(reply);
                 });
-            }
-        },
+            },
 
-        speakAI(text) {
-            // 1. Clean Text (CRITICAL FIX for Inner Voice Leak via handleRemoteAccept)
-            let cleanText = text.replace(/###/g, '')
-                // Strict Block Removal with Case Insensitivity and Space Tolerance
-                .replace(/\[\s*INNER_VOICE\s*\][\s\S]*?\[\s*\/\s*INNER_VOICE\s*\]/gi, '')
-                .replace(/\[\s*INNER_VOICE\s*\][\s\S]*?(\n|$)/gi, '')
-                .replace(/\[\s*\/\s*INNER_VOICE\s*\]/gi, '')
-                .replace(/\[表情包.*?\]/g, '')
-                .replace(/\{[\s\S]*?\}/g, '')
-                .replace(/<[^>]*>/g, '')
-                .replace(/\*.*?\*/g, '')
-                .trim();
-            this.onAIResponse(cleanText, { text: cleanText });
-        },
+            rejectCall() {
+                console.log('[CallLogic] User rejected call');
+                this.stopRingtone();
+                this.hideOverlay();
+                WeChatUI.sendHiddenSystemMessage(this.charId, '[System: User rejected the call.]');
+                this.reset();
+            },
 
-        showOverlay(char, mode) {
-            const overlay = document.getElementById('call-overlay');
-            overlay.classList.remove('hidden');
-            document.getElementById('call-name').textContent = char.name;
-            document.getElementById('call-avatar').src = char.avatar;
-            document.getElementById('call-status').textContent = mode === 'outgoing' ? '正在呼叫...' : '邀请你进行语音通话...';
-            this.updateLayout(mode);
+            endCall() {
+                const duration = this.getDurationStr();
+                console.log(`[CallLogic] Ending call. Duration: ${duration}`);
+                this.stopRingtone();
+                this.stopListening();
+                this.stopVideo();
+                this.hideOverlay();
 
-            // Optional: Video Background
-            if (this.callType === 'video' && char.call_assets) {
-                // Try to find video asset... (Placeholder for now)
-            }
-        },
+                // Insert Summary Card (initiator's perspective)
+                if (this.charId) {
+                    const typeText = this.callType === 'video' ? '视频通话' : '语音通话';
+                    const summary = `[${typeText}] 通话时长 ${duration}`;
+                    // 发起人视角：如果是用户发起的，role为user；如果是AI发起的，role为ai
+                    const msgRole = this.initiator === 'user' ? 'user' : 'ai';
 
-        startVideo() {
-            // Check User Avatar
-            const profile = AppStorage.get('wechat_user_profile', {});
-            const userAvatar = profile.avatar; // Base64
-
-            const videoEl = document.getElementById('local-video-preview');
-            // Create or Find Avatar Img Container
-            let avatarEl = document.getElementById('local-video-avatar');
-
-            if (!avatarEl && videoEl) {
-                avatarEl = document.createElement('img');
-                avatarEl.id = 'local-video-avatar';
-                avatarEl.style.width = '100%';
-                avatarEl.style.height = '100%';
-                avatarEl.style.objectFit = 'cover';
-                avatarEl.className = videoEl.className;
-                videoEl.parentElement.appendChild(avatarEl);
-            }
-
-            if (userAvatar && avatarEl) {
-                // Use Avatar Image
-                avatarEl.src = userAvatar;
-                avatarEl.classList.remove('hidden');
-                if (videoEl) videoEl.classList.add('hidden');
-
-                // Get Audio Only
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ audio: true })
-                        .then(stream => {
-                            window.localStream = stream;
-                        })
-                        .catch(e => console.error('Audio access denied:', e));
+                    console.log(`[CallLogic] Logging call. Initiator: ${this.initiator}, Role: ${msgRole}`);
+                    WeChatUI.pushMessage('call_log', summary, msgRole, null, null, this.charId);
                 }
-            } else {
-                // Fallback to Camera
-                if (avatarEl) avatarEl.classList.add('hidden');
-                if (videoEl) videoEl.classList.remove('hidden');
+                this.reset();
+            },
 
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                        .then(stream => {
-                            if (videoEl) {
-                                videoEl.srcObject = stream;
-                                videoEl.parentElement.classList.remove('hidden');
-                            }
-                            window.localStream = stream;
-                        })
-                        .catch(e => console.error('Camera access denied:', e));
+            handleRemoteAccept(firstReply) {
+                this.state = 'CONNECTED';
+                console.log('[CallLogic] Remote accepted call');
+                this.stopRingtone();
+                this.updateLayout('connected');
+                this.startTimer();
+                if (this.callType === 'video') this.startVideo();
+                this.startListening();
+                this.speakAI(firstReply);
+            },
+
+            handleRemoteReject(reason) {
+                console.log('[CallLogic] Remote rejected call. Reason:', reason);
+                document.getElementById('call-status').textContent = "对方忙线中";
+                setTimeout(() => {
+                    this.hideOverlay();
+                    const cleanReason = reason.replace(/\[REJECT\]/g, '').trim();
+                    WeChatUI.pushMessage('text', cleanReason, 'assistant', null, null, this.charId);
+                    this.reset();
+                }, 2000);
+            },
+
+            handleUserSpeech(text) {
+                if (!text || this.state !== 'CONNECTED') return;
+                console.log('[CallLogic] User STT:', text);
+                document.getElementById('call-stt-preview').textContent = text;
+
+                // 1. Push user voice message as HIDDEN (to keep context without cluttering UI)
+                WeChatUI.pushMessage('voice', text, 'user', null, null, this.charId, { hidden: true });
+
+                // 2. Trigger AI Response
+                const chars = AppStorage.get('wechat_chars', {});
+                const char = chars[this.charId];
+                if (!char) return;
+
+                const msgs = (char.msgs || []).slice(-30); // Use 30 messages for more context during call
+                let apiMessages = [{ role: 'system', content: '' }];
+
+                const historyApiMsgs = msgs.map(m => ({
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content: typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? JSON.stringify(m.content) : String(m.content))
+                }));
+
+                // Add extra emphasis to the voice constraint in the current turn
+                if (historyApiMsgs.length > 0 && historyApiMsgs[historyApiMsgs.length - 1].role === 'user') {
+                    historyApiMsgs[historyApiMsgs.length - 1].content += "\n(System: Remember, we are in a voice call. Spoken words only.)";
                 }
-            }
-        },
+                apiMessages = apiMessages.concat(historyApiMsgs);
 
-        stopVideo() {
-            if (window.localStream) {
-                window.localStream.getTracks().forEach(track => track.stop());
-                window.localStream = null;
-            }
-            const videoEl = document.getElementById('local-video-preview');
-            if (videoEl) {
-                videoEl.srcObject = null;
-                videoEl.parentElement.classList.add('hidden');
-            }
-            const avatarEl = document.getElementById('local-video-avatar');
-            if (avatarEl) avatarEl.remove();
-        },
+                SettingsLogic.generateLLM(apiMessages, this.charId, 'call_signal').then(reply => {
+                    if (reply) {
+                        let cleanReply = reply.replace(/###/g, '')
+                            .replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '')
+                            .replace(/\[表情包.*?\]/g, '')
+                            .replace(/\{[\s\S]*?\}/g, '')
+                            .replace(/<[^>]*>/g, '')
+                            .replace(/\*.*?\*/g, '')
+                            .trim();
 
-        hideOverlay() { document.getElementById('call-overlay').classList.add('hidden'); },
-
-        updateLayout(mode) {
-            const activeControls = document.getElementById('call-controls-active');
-            const incomingControls = document.getElementById('call-controls-incoming');
-            if (mode === 'connected' || mode === 'outgoing') { // Show active controls for outgoing to allow cancel
-                activeControls.classList.remove('hidden');
-                incomingControls.classList.add('hidden');
-                if (mode === 'connected') document.getElementById('call-status').textContent = "00:00";
-            } else if (mode === 'incoming') {
-                activeControls.classList.add('hidden');
-                incomingControls.classList.remove('hidden');
-            }
-        },
-
-        startListening() {
-            this.isActive = true;
-            try { this.recognition && this.recognition.start(); } catch (e) { }
-        },
-        stopListening() {
-            this.isActive = false;
-            this.recognition && this.recognition.stop();
-        },
-
-        playRingtone(type) {
-            // Simple synthetic ringtone
-            if (this.ringtoneTimer) clearInterval(this.ringtoneTimer);
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const playBeep = () => {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-
-                    if (type === 'incoming') {
-                        // Double beep for incoming
-                        osc.frequency.setValueAtTime(800, ctx.currentTime);
-                        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-                        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.5);
-                    } else {
-                        // Long low beep for outgoing
-                        osc.frequency.setValueAtTime(440, ctx.currentTime);
-                        gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 1.0);
+                        this.speakAI(cleanReply);
+                        // Push AI reply as HIDDEN too? No, usually you want to see the AI's "last words" if they were important
+                        // But for voice calls, maybe just summary is enough. 
+                        // However, we push to history for context.
+                        WeChatUI.pushMessage('text', cleanReply, 'assistant', null, null, this.charId, { hidden: true });
                     }
-                };
-                playBeep();
-                this.ringtoneTimer = setInterval(playBeep, type === 'incoming' ? 1500 : 2000);
-            } catch (e) { console.error('AudioContext error', e); }
-        },
-        stopRingtone() {
-            if (this.ringtoneTimer) clearInterval(this.ringtoneTimer);
-            this.ringtoneTimer = null;
-        },
+                });
+            },
 
-        startTimer() {
-            this.startTime = Date.now();
-            this.timerInterval = setInterval(() => {
-                const diff = Math.floor((Date.now() - this.startTime) / 1000);
-                const min = Math.floor(diff / 60).toString().padStart(2, '0');
-                const sec = (diff % 60).toString().padStart(2, '0');
-                document.getElementById('call-status').textContent = `${min}:${sec}`;
-            }, 1000);
-        },
-        stopTimer() { clearInterval(this.timerInterval); },
-        getDurationStr() { return document.getElementById('call-status').textContent; },
-        reset() { this.state = 'IDLE'; this.stopTimer(); this.charId = null; },
-        toggleMute() {
-            this.isMuted = !this.isMuted;
-            document.getElementById('icon-mic').className = this.isMuted ? 'fa-solid fa-microphone-slash text-red-500' : 'fa-solid fa-microphone text-xl';
-            if (this.isMuted) this.stopListening(); else this.startListening();
-        },
-        toggleInput() {
-            const box = document.getElementById('call-input-box');
-            box.classList.toggle('hidden');
-            if (!box.classList.contains('hidden')) {
-                box.classList.remove('translate-y-10', 'opacity-0');
-                document.getElementById('input-call-text').focus();
-            } else { box.classList.add('translate-y-10', 'opacity-0'); }
-        },
-        sendText() {
-            const input = document.getElementById('input-call-text');
-            if (input.value) { this.handleUserSpeech(input.value); input.value = ''; this.toggleInput(); }
-        }
-    };
+            // Called by WeChatUI when AI replies during call
+            onAIResponse(text, msgObject) {
+                if (this.state !== 'CONNECTED') return;
 
-    document.addEventListener('DOMContentLoaded', () => CallLogic.init());
-</script>
+                const subtitleEl = document.getElementById('call-ai-subtitle');
 
-<!-- [New] Call UI Overlay -->
-<div id="call-overlay" class="fixed inset-0 z-[9999] hidden flex flex-col items-center justify-between text-white"
-    style="background-color: #111; background-size: cover; background-position: center; transition: opacity 0.3s ease;">
-    <!-- Backdrop filter for blur -->
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-md z-0 transition-all duration-1000" id="call-backdrop">
-    </div>
+                // 【修复】清理字幕文本 (去除 HTML 标签、Inner Voice、JSON 和 ###)
+                let cleanText = text.replace(/###/g, '')
+                    .replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '')
+                    .replace(/\[INNER_VOICE\][\s\S]*?(\n|$)/gi, '')
+                    .replace(/\[\/INNER_VOICE\]/gi, '')
+                    .replace(/\[表情包.*?\]/g, '')
+                    .replace(/\{[\s\S]*?\}/g, '')
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/\*.*?\*/g, '')
+                    .trim();
 
-    <!-- Video Background (Optional) -->
-    <video id="call-bg-video"
-        class="absolute inset-0 w-full h-full object-cover z-0 hidden opacity-0 transition-opacity duration-1000" loop
-        muted playsinline></video>
+                cleanText = cleanText.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
-    <!-- Top Info -->
-    <div class="z-10 mt-20 flex flex-col items-center transform transition-transform duration-500" id="call-info-panel">
-        <div class="relative">
-            <img id="call-avatar" src="" class="w-28 h-28 rounded-2xl shadow-2xl border border-white/10 object-cover">
-            <!-- Ripple for talking/ringing -->
-            <div id="call-avatar-ripple" class="absolute inset-0 rounded-2xl animate-ping bg-white/20 hidden"></div>
+                // 如果文本过长，不再截断，而是使用滚动框
+                // if (cleanText.length > 60) ... REMOVED
+
+                subtitleEl.textContent = cleanText;
+                subtitleEl.classList.remove('opacity-0', 'translate-y-4');
+
+                // 【UI 优化】滚动式字幕框
+                subtitleEl.style.maxHeight = '140px';
+                subtitleEl.style.overflowY = 'auto';
+                subtitleEl.style.whiteSpace = 'pre-wrap';
+                subtitleEl.style.pointerEvents = 'auto';
+                subtitleEl.style.background = 'rgba(0,0,0,0.3)'; // 半透明背景方便阅读
+                subtitleEl.style.padding = '10px';
+                subtitleEl.style.borderRadius = '8px';
+
+                // TTS
+                if (window.SettingsLogic && SettingsLogic.generateTTS) {
+                    const chars = AppStorage.get('wechat_chars', {});
+                    SettingsLogic.generateTTS(text, chars[this.charId]).then(url => {
+                        if (url) {
+                            const audio = new Audio(url);
+                            audio.play();
+                            document.getElementById('call-avatar-ripple').classList.remove('hidden');
+                            audio.onended = () => {
+                                document.getElementById('call-avatar-ripple').classList.add('hidden');
+                                setTimeout(() => {
+                                    subtitleEl.classList.add('opacity-0', 'translate-y-4');
+                                }, 2000);
+                            };
+                        }
+                    });
+                }
+            },
+
+            speakAI(text) {
+                // 1. Clean Text (CRITICAL FIX for Inner Voice Leak via handleRemoteAccept)
+                let cleanText = text.replace(/###/g, '')
+                    // Strict Block Removal with Case Insensitivity and Space Tolerance
+                    .replace(/\[\s*INNER_VOICE\s*\][\s\S]*?\[\s*\/\s*INNER_VOICE\s*\]/gi, '')
+                    .replace(/\[\s*INNER_VOICE\s*\][\s\S]*?(\n|$)/gi, '')
+                    .replace(/\[\s*\/\s*INNER_VOICE\s*\]/gi, '')
+                    .replace(/\[表情包.*?\]/g, '')
+                    .replace(/\{[\s\S]*?\}/g, '')
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/\*.*?\*/g, '')
+                    .trim();
+                this.onAIResponse(cleanText, { text: cleanText });
+            },
+
+            showOverlay(char, mode) {
+                const overlay = document.getElementById('call-overlay');
+                overlay.classList.remove('hidden');
+                document.getElementById('call-name').textContent = char.name;
+                document.getElementById('call-avatar').src = char.avatar;
+                document.getElementById('call-status').textContent = mode === 'outgoing' ? '正在呼叫...' : '邀请你进行语音通话...';
+                this.updateLayout(mode);
+
+                // Optional: Video Background
+                if (this.callType === 'video' && char.call_assets) {
+                    // Try to find video asset... (Placeholder for now)
+                }
+            },
+
+            startVideo() {
+                // Check User Avatar
+                const profile = AppStorage.get('wechat_user_profile', {});
+                const userAvatar = profile.avatar; // Base64
+
+                const videoEl = document.getElementById('local-video-preview');
+                // Create or Find Avatar Img Container
+                let avatarEl = document.getElementById('local-video-avatar');
+
+                if (!avatarEl && videoEl) {
+                    avatarEl = document.createElement('img');
+                    avatarEl.id = 'local-video-avatar';
+                    avatarEl.style.width = '100%';
+                    avatarEl.style.height = '100%';
+                    avatarEl.style.objectFit = 'cover';
+                    avatarEl.className = videoEl.className;
+                    videoEl.parentElement.appendChild(avatarEl);
+                }
+
+                if (userAvatar && avatarEl) {
+                    // Use Avatar Image
+                    avatarEl.src = userAvatar;
+                    avatarEl.classList.remove('hidden');
+                    if (videoEl) videoEl.classList.add('hidden');
+
+                    // Get Audio Only
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ audio: true })
+                            .then(stream => {
+                                window.localStream = stream;
+                            })
+                            .catch(e => console.error('Audio access denied:', e));
+                    }
+                } else {
+                    // Fallback to Camera
+                    if (avatarEl) avatarEl.classList.add('hidden');
+                    if (videoEl) videoEl.classList.remove('hidden');
+
+                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                            .then(stream => {
+                                if (videoEl) {
+                                    videoEl.srcObject = stream;
+                                    videoEl.parentElement.classList.remove('hidden');
+                                }
+                                window.localStream = stream;
+                            })
+                            .catch(e => console.error('Camera access denied:', e));
+                    }
+                }
+            },
+
+            stopVideo() {
+                if (window.localStream) {
+                    window.localStream.getTracks().forEach(track => track.stop());
+                    window.localStream = null;
+                }
+                const videoEl = document.getElementById('local-video-preview');
+                if (videoEl) {
+                    videoEl.srcObject = null;
+                    videoEl.parentElement.classList.add('hidden');
+                }
+                const avatarEl = document.getElementById('local-video-avatar');
+                if (avatarEl) avatarEl.remove();
+            },
+
+            hideOverlay() { document.getElementById('call-overlay').classList.add('hidden'); },
+
+            updateLayout(mode) {
+                const activeControls = document.getElementById('call-controls-active');
+                const incomingControls = document.getElementById('call-controls-incoming');
+                if (mode === 'connected' || mode === 'outgoing') { // Show active controls for outgoing to allow cancel
+                    activeControls.classList.remove('hidden');
+                    incomingControls.classList.add('hidden');
+                    if (mode === 'connected') document.getElementById('call-status').textContent = "00:00";
+                } else if (mode === 'incoming') {
+                    activeControls.classList.add('hidden');
+                    incomingControls.classList.remove('hidden');
+                }
+            },
+
+            startListening() {
+                this.isActive = true;
+                try { this.recognition && this.recognition.start(); } catch (e) { }
+            },
+            stopListening() {
+                this.isActive = false;
+                this.recognition && this.recognition.stop();
+            },
+
+            playRingtone(type) {
+                // Simple synthetic ringtone
+                if (this.ringtoneTimer) clearInterval(this.ringtoneTimer);
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const playBeep = () => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+
+                        if (type === 'incoming') {
+                            // Double beep for incoming
+                            osc.frequency.setValueAtTime(800, ctx.currentTime);
+                            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 0.5);
+                        } else {
+                            // Long low beep for outgoing
+                            osc.frequency.setValueAtTime(440, ctx.currentTime);
+                            gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 1.0);
+                        }
+                    };
+                    playBeep();
+                    this.ringtoneTimer = setInterval(playBeep, type === 'incoming' ? 1500 : 2000);
+                } catch (e) { console.error('AudioContext error', e); }
+            },
+            stopRingtone() {
+                if (this.ringtoneTimer) clearInterval(this.ringtoneTimer);
+                this.ringtoneTimer = null;
+            },
+
+            startTimer() {
+                this.startTime = Date.now();
+                this.timerInterval = setInterval(() => {
+                    const diff = Math.floor((Date.now() - this.startTime) / 1000);
+                    const min = Math.floor(diff / 60).toString().padStart(2, '0');
+                    const sec = (diff % 60).toString().padStart(2, '0');
+                    document.getElementById('call-status').textContent = `${min}:${sec}`;
+                }, 1000);
+            },
+            stopTimer() { clearInterval(this.timerInterval); },
+            getDurationStr() { return document.getElementById('call-status').textContent; },
+            reset() { this.state = 'IDLE'; this.stopTimer(); this.charId = null; },
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                document.getElementById('icon-mic').className = this.isMuted ? 'fa-solid fa-microphone-slash text-red-500' : 'fa-solid fa-microphone text-xl';
+                if (this.isMuted) this.stopListening(); else this.startListening();
+            },
+            toggleInput() {
+                const box = document.getElementById('call-input-box');
+                box.classList.toggle('hidden');
+                if (!box.classList.contains('hidden')) {
+                    box.classList.remove('translate-y-10', 'opacity-0');
+                    document.getElementById('input-call-text').focus();
+                } else { box.classList.add('translate-y-10', 'opacity-0'); }
+            },
+            sendText() {
+                const input = document.getElementById('input-call-text');
+                if (input.value) { this.handleUserSpeech(input.value); input.value = ''; this.toggleInput(); }
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => CallLogic.init());
+    </script>
+
+    <!-- [New] Call UI Overlay -->
+    <div id="call-overlay" class="fixed inset-0 z-[9999] hidden flex flex-col items-center justify-between text-white"
+        style="background-color: #111; background-size: cover; background-position: center; transition: opacity 0.3s ease;">
+        <!-- Backdrop filter for blur -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-md z-0 transition-all duration-1000" id="call-backdrop">
         </div>
-        <h2 id="call-name" class="mt-6 text-2xl font-bold tracking-wide drop-shadow-lg">Character Name</h2>
-        <p id="call-status" class="mt-2 text-sm text-gray-300 font-medium">正在等待接听...</p>
-    </div>
 
-    <!-- Center Visualization / Video -->
-    <div class="z-10 flex-1 flex flex-col items-center justify-center w-full px-4 relative">
-        <!-- Local Video (PiP) -->
-        <div id="local-video-container"
-            class="absolute top-4 right-4 w-28 h-40 bg-black/50 rounded-xl overflow-hidden hidden border border-white/20 shadow-2xl transition-all duration-300 hover:scale-105">
-            <video id="local-video-preview" class="w-full h-full object-cover transform -scale-x-100" autoplay muted
-                playsinline></video>
-        </div>
+        <!-- Video Background (Optional) -->
+        <video id="call-bg-video"
+            class="absolute inset-0 w-full h-full object-cover z-0 hidden opacity-0 transition-opacity duration-1000"
+            loop muted playsinline></video>
 
-        <!-- Subtitle / Stt Result -->
-        <div id="call-subtitle-container" class="mt-auto mb-10 w-full max-w-md text-center px-4">
-            <!-- User STT Preview -->
-            <p id="call-stt-preview" class="text-white/60 text-sm italic mb-3 min-h-[20px] transition-all duration-200">
-            </p>
-            <!-- AI Subtitle -->
+        <!-- Top Info -->
+        <div class="z-10 mt-20 flex flex-col items-center transform transition-transform duration-500"
+            id="call-info-panel">
             <div class="relative">
-                <p id="call-ai-subtitle"
-                    class="text-white font-medium text-lg leading-relaxed drop-shadow-md bg-black/20 backdrop-blur-sm px-4 py-2 rounded-xl inline-block transition-all duration-300 transform translate-y-4 opacity-0">
-                    <!-- AI text goes here -->
+                <img id="call-avatar" src=""
+                    class="w-28 h-28 rounded-2xl shadow-2xl border border-white/10 object-cover">
+                <!-- Ripple for talking/ringing -->
+                <div id="call-avatar-ripple" class="absolute inset-0 rounded-2xl animate-ping bg-white/20 hidden"></div>
+            </div>
+            <h2 id="call-name" class="mt-6 text-2xl font-bold tracking-wide drop-shadow-lg">Character Name</h2>
+            <p id="call-status" class="mt-2 text-sm text-gray-300 font-medium">正在等待接听...</p>
+        </div>
+
+        <!-- Center Visualization / Video -->
+        <div class="z-10 flex-1 flex flex-col items-center justify-center w-full px-4 relative">
+            <!-- Local Video (PiP) -->
+            <div id="local-video-container"
+                class="absolute top-4 right-4 w-28 h-40 bg-black/50 rounded-xl overflow-hidden hidden border border-white/20 shadow-2xl transition-all duration-300 hover:scale-105">
+                <video id="local-video-preview" class="w-full h-full object-cover transform -scale-x-100" autoplay muted
+                    playsinline></video>
+            </div>
+
+            <!-- Subtitle / Stt Result -->
+            <div id="call-subtitle-container" class="mt-auto mb-10 w-full max-w-md text-center px-4">
+                <!-- User STT Preview -->
+                <p id="call-stt-preview"
+                    class="text-white/60 text-sm italic mb-3 min-h-[20px] transition-all duration-200">
                 </p>
+                <!-- AI Subtitle -->
+                <div class="relative">
+                    <p id="call-ai-subtitle"
+                        class="text-white font-medium text-lg leading-relaxed drop-shadow-md bg-black/20 backdrop-blur-sm px-4 py-2 rounded-xl inline-block transition-all duration-300 transform translate-y-4 opacity-0">
+                        <!-- AI text goes here -->
+                    </p>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Bottom Controls -->
-    <div class="z-10 mb-16 w-full px-12">
-        <!-- Connected Controls -->
-        <div id="call-controls-active" class="grid grid-cols-3 gap-8 items-center justify-items-center hidden">
-            <!-- Mute -->
-            <button id="btn-call-mute" onclick="CallLogic.toggleMute()"
-                class="flex flex-col items-center gap-2 group transition-transform active:scale-95">
-                <div
-                    class="w-16 h-16 rounded-full bg-white/10 group-active:bg-white/20 flex items-center justify-center backdrop-blur-sm transition-all border border-white/10 hover:bg-white/15">
-                    <i class="fa-solid fa-microphone text-xl" id="icon-mic"></i>
-                </div>
-                <span class="text-xs text-gray-300">麦克风</span>
-            </button>
+        <!-- Bottom Controls -->
+        <div class="z-10 mb-16 w-full px-12">
+            <!-- Connected Controls -->
+            <div id="call-controls-active" class="grid grid-cols-3 gap-8 items-center justify-items-center hidden">
+                <!-- Mute -->
+                <button id="btn-call-mute" onclick="CallLogic.toggleMute()"
+                    class="flex flex-col items-center gap-2 group transition-transform active:scale-95">
+                    <div
+                        class="w-16 h-16 rounded-full bg-white/10 group-active:bg-white/20 flex items-center justify-center backdrop-blur-sm transition-all border border-white/10 hover:bg-white/15">
+                        <i class="fa-solid fa-microphone text-xl" id="icon-mic"></i>
+                    </div>
+                    <span class="text-xs text-gray-300">麦克风</span>
+                </button>
 
-            <!-- Hangup -->
-            <button onclick="CallLogic.endCall()"
-                class="flex flex-col items-center gap-2 group transition-transform active:scale-90">
-                <div
-                    class="w-20 h-20 rounded-full bg-red-500 shadow-lg shadow-red-500/40 flex items-center justify-center hover:bg-red-600 transition-all">
-                    <i class="fa-solid fa-phone-slash text-2xl text-white"></i>
-                </div>
-                <span class="text-xs text-gray-300">挂断</span>
-            </button>
+                <!-- Hangup -->
+                <button onclick="CallLogic.endCall()"
+                    class="flex flex-col items-center gap-2 group transition-transform active:scale-90">
+                    <div
+                        class="w-20 h-20 rounded-full bg-red-500 shadow-lg shadow-red-500/40 flex items-center justify-center hover:bg-red-600 transition-all">
+                        <i class="fa-solid fa-phone-slash text-2xl text-white"></i>
+                    </div>
+                    <span class="text-xs text-gray-300">挂断</span>
+                </button>
 
-            <!-- Input/Keyboard -->
-            <button id="btn-call-input" onclick="CallLogic.toggleInput()"
-                class="flex flex-col items-center gap-2 group transition-transform active:scale-95">
-                <div
-                    class="w-16 h-16 rounded-full bg-white/10 group-active:bg-white/20 flex items-center justify-center backdrop-blur-sm transition-all border border-white/10 hover:bg-white/15">
-                    <i class="fa-solid fa-keyboard text-xl"></i>
-                </div>
-                <span class="text-xs text-gray-300">输入</span>
-            </button>
+                <!-- Input/Keyboard -->
+                <button id="btn-call-input" onclick="CallLogic.toggleInput()"
+                    class="flex flex-col items-center gap-2 group transition-transform active:scale-95">
+                    <div
+                        class="w-16 h-16 rounded-full bg-white/10 group-active:bg-white/20 flex items-center justify-center backdrop-blur-sm transition-all border border-white/10 hover:bg-white/15">
+                        <i class="fa-solid fa-keyboard text-xl"></i>
+                    </div>
+                    <span class="text-xs text-gray-300">输入</span>
+                </button>
+            </div>
+
+            <!-- Incoming Call Controls -->
+            <div id="call-controls-incoming" class="flex justify-between items-end w-full px-8 hidden">
+                <!-- Reject -->
+                <button onclick="CallLogic.rejectCall()" class="flex flex-col items-center gap-3 group">
+                    <div
+                        class="w-16 h-16 rounded-full bg-red-500 shadow-lg flex items-center justify-center animate-bounce-slight hover:bg-red-600 transition-colors">
+                        <i class="fa-solid fa-phone-slash text-xl text-white"></i>
+                    </div>
+                    <span class="text-sm">拒绝</span>
+                </button>
+
+                <!-- Accept -->
+                <button onclick="CallLogic.acceptCall()" class="flex flex-col items-center gap-3 group">
+                    <div
+                        class="w-16 h-16 rounded-full bg-green-500 shadow-lg flex items-center justify-center animate-bounce-slight hover:bg-green-600 transition-colors">
+                        <i class="fa-solid fa-phone text-xl text-white animate-pulse"></i>
+                    </div>
+                    <span class="text-sm">接听</span>
+                </button>
+            </div>
         </div>
 
-        <!-- Incoming Call Controls -->
-        <div id="call-controls-incoming" class="flex justify-between items-end w-full px-8 hidden">
-            <!-- Reject -->
-            <button onclick="CallLogic.rejectCall()" class="flex flex-col items-center gap-3 group">
-                <div
-                    class="w-16 h-16 rounded-full bg-red-500 shadow-lg flex items-center justify-center animate-bounce-slight hover:bg-red-600 transition-colors">
-                    <i class="fa-solid fa-phone-slash text-xl text-white"></i>
-                </div>
-                <span class="text-sm">拒绝</span>
-            </button>
-
-            <!-- Accept -->
-            <button onclick="CallLogic.acceptCall()" class="flex flex-col items-center gap-3 group">
-                <div
-                    class="w-16 h-16 rounded-full bg-green-500 shadow-lg flex items-center justify-center animate-bounce-slight hover:bg-green-600 transition-colors">
-                    <i class="fa-solid fa-phone text-xl text-white animate-pulse"></i>
-                </div>
-                <span class="text-sm">接听</span>
-            </button>
+        <!-- Floating Input (Hidden by default) -->
+        <div id="call-input-box"
+            class="absolute bottom-40 left-6 right-6 z-20 hidden transform transition-all duration-300 translate-y-10 opacity-0 bg-gray-900/90 backdrop-blur-xl rounded-2xl p-2 border border-white/10 shadow-2xl">
+            <div class="flex gap-2 items-center">
+                <input type="text" id="input-call-text"
+                    class="bg-transparent border-none text-white placeholder-gray-400 flex-1 px-3 py-2 focus:ring-0 text-base"
+                    placeholder="不方便说话？打字给TA...">
+                <button onclick="CallLogic.sendText()"
+                    class="bg-green-500 hover:bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-paper-plane text-xs"></i>
+                </button>
+            </div>
         </div>
+
+        <!-- Hidden audio element for Ringtones -->
+        <audio id="audio-ringtone" loop></audio>
     </div>
-
-    <!-- Floating Input (Hidden by default) -->
-    <div id="call-input-box"
-        class="absolute bottom-40 left-6 right-6 z-20 hidden transform transition-all duration-300 translate-y-10 opacity-0 bg-gray-900/90 backdrop-blur-xl rounded-2xl p-2 border border-white/10 shadow-2xl">
-        <div class="flex gap-2 items-center">
-            <input type="text" id="input-call-text"
-                class="bg-transparent border-none text-white placeholder-gray-400 flex-1 px-3 py-2 focus:ring-0 text-base"
-                placeholder="不方便说话？打字给TA...">
-            <button onclick="CallLogic.sendText()"
-                class="bg-green-500 hover:bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors">
-                <i class="fa-solid fa-paper-plane text-xs"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- Hidden audio element for Ringtones -->
-    <audio id="audio-ringtone" loop></audio>
-</div>
-<!-- 【新增】查手机模式下的小组件独立性支持 -->
-<script>
-    (function () {
-        // 定期检查 SearchPhoneUI 是否加载完成
-        const checkInit = setInterval(() => {
-            if (window.SearchPhoneUI) {
-                clearInterval(checkInit);
-                initSearchPhoneHooks();
-            }
-        }, 500);
-
-        function initSearchPhoneHooks() {
-            // Hook SearchPhoneUI 相关方法
-            const targets = ['open', 'init', 'render'];
-            let hooked = false;
-
-            targets.forEach(method => {
-                if (typeof SearchPhoneUI[method] === 'function') {
-                    const original = SearchPhoneUI[method];
-                    SearchPhoneUI[method] = function () {
-                        const result = original.apply(this, arguments);
-                        // 如果设置了 targetCharId，说明进入了查手机模式
-                        if (SearchPhoneUI.targetCharId) {
-                            applyCharWidgets(SearchPhoneUI.targetCharId);
-                        }
-                        return result;
-                    };
-                    hooked = true;
+    <!-- 【新增】查手机模式下的小组件独立性支持 -->
+    <script>
+        (function () {
+            // 定期检查 SearchPhoneUI 是否加载完成
+            const checkInit = setInterval(() => {
+                if (window.SearchPhoneUI) {
+                    clearInterval(checkInit);
+                    initSearchPhoneHooks();
                 }
-            });
+            }, 500);
 
-            // 如果没找到方法 hook, 尝试监听 onclick 事件作为补充
-            if (!hooked) {
-                document.addEventListener('click', (e) => {
-                    const searchIcon = e.target.closest('#icon-search') || e.target.closest('[onclick*="openApp(\'search\')"]');
-                    if (searchIcon) {
-                        setTimeout(() => {
+            function initSearchPhoneHooks() {
+                // Hook SearchPhoneUI 相关方法
+                const targets = ['open', 'init', 'render'];
+                let hooked = false;
+
+                targets.forEach(method => {
+                    if (typeof SearchPhoneUI[method] === 'function') {
+                        const original = SearchPhoneUI[method];
+                        SearchPhoneUI[method] = function () {
+                            const result = original.apply(this, arguments);
+                            // 如果设置了 targetCharId，说明进入了查手机模式
                             if (SearchPhoneUI.targetCharId) {
                                 applyCharWidgets(SearchPhoneUI.targetCharId);
                             }
-                        }, 500);
+                            return result;
+                        };
+                        hooked = true;
                     }
                 });
+
+                // 如果没找到方法 hook, 尝试监听 onclick 事件作为补充
+                if (!hooked) {
+                    document.addEventListener('click', (e) => {
+                        const searchIcon = e.target.closest('#icon-search') || e.target.closest('[onclick*="openApp(\'search\')"]');
+                        if (searchIcon) {
+                            setTimeout(() => {
+                                if (SearchPhoneUI.targetCharId) {
+                                    applyCharWidgets(SearchPhoneUI.targetCharId);
+                                }
+                            }, 500);
+                        }
+                    });
+                }
             }
-        }
 
-        function applyCharWidgets(charId) {
-            console.log('[SearchPhone] Applying widgets for char:', charId);
-            const saveKey = 'theme_config_' + charId;
-            const charTheme = AppStorage.get(saveKey, {});
-            const globalTheme = AppStorage.get('theme_config', {});
-
-            // 构造混合配置：全局基础 + 角色组件
-            // 注意：我们必须确保 t.widgets 存在，否则 ThemeLogic.apply 不会更新 DOM
-            const widgets = charTheme.widgets || {};
-
-            const appliedTheme = {
-                ...globalTheme,
-                widgets: widgets,
-                widgetTransforms: charTheme.widgetTransforms || {}
-            };
-
-            ThemeLogic.apply(appliedTheme);
-        }
-
-        // 监听退出查手机
-        const originalCloseApp = window.closeApp;
-        window.closeApp = function () {
-            if (originalCloseApp) originalCloseApp.apply(this, arguments);
-
-            // 简单判断：如果当前是在关闭 SearchApp，则恢复全局
-            // 这里我们假设 closeApp 被调用意味着并不是在 SearchPhone 内部操作
-            // 或者我们可以检查 SearchPhoneUI 状态?
-
-            // 延迟恢复，确保 UI 切换完成
-            setTimeout(() => {
+            function applyCharWidgets(charId) {
+                console.log('[SearchPhone] Applying widgets for char:', charId);
+                const saveKey = 'theme_config_' + charId;
+                const charTheme = AppStorage.get(saveKey, {});
                 const globalTheme = AppStorage.get('theme_config', {});
-                ThemeLogic.apply(globalTheme);
-            }, 100);
-        };
-    })();
-</script>
 
-<!-- [Auto-Fix] Phone UI Interaction Patch -->
-<script>
-    (function () {
-        console.log('[Fix] Initializing Phone UI Auto-Repair...');
+                // 构造混合配置：全局基础 + 角色组件
+                // 注意：我们必须确保 t.widgets 存在，否则 ThemeLogic.apply 不会更新 DOM
+                const widgets = charTheme.widgets || {};
 
-        // 1. Monkey-patch SearchPhoneUI.closeSubApp
-        const fixInterval = setInterval(() => {
-            if (typeof SearchPhoneUI !== 'undefined' && SearchPhoneUI.closeSubApp) {
-                console.log('[Fix] SearchPhoneUI found, applying patch...');
-
-                const originalClose = SearchPhoneUI.closeSubApp;
-                SearchPhoneUI.closeSubApp = function () {
-                    console.log('[Fix] Closing app via patched function...');
-                    // Call original
-                    originalClose.apply(this, arguments);
-
-                    // FORCE RESET UI State
-                    setTimeout(() => {
-                        console.log('[Fix] Resetting UI state after app close');
-                        document.body.style.overflow = '';
-                        document.body.style.pointerEvents = 'auto';
-
-                        const desktop = document.getElementById('search-page-desktop');
-                        if (desktop) desktop.style.pointerEvents = 'auto';
-
-                        const select = document.getElementById('search-page-select');
-                        if (select) select.style.pointerEvents = 'auto';
-
-                        const appSearch = document.getElementById('app-search');
-                        if (appSearch) appSearch.style.pointerEvents = 'auto';
-                    }, 100);
+                const appliedTheme = {
+                    ...globalTheme,
+                    widgets: widgets,
+                    widgetTransforms: charTheme.widgetTransforms || {}
                 };
 
-                clearInterval(fixInterval);
+                ThemeLogic.apply(appliedTheme);
             }
-        }, 500);
 
-        // 2. Global Watchdog (Safety Net)
-        setInterval(() => {
-            const subAppModal = document.getElementById('modal-phone-subapp');
-            // If modal exists and is hidden (translated away)
-            if (subAppModal && subAppModal.classList.contains('translate-y-full')) {
-                // Check if body is locked
-                if (document.body.style.pointerEvents === 'none') {
-                    console.log('[Fix] Watchdog: Detected stuck pointer-events, resetting...');
-                    document.body.style.pointerEvents = 'auto';
+            // 监听退出查手机
+            const originalCloseApp = window.closeApp;
+            window.closeApp = function () {
+                if (originalCloseApp) originalCloseApp.apply(this, arguments);
+
+                // 简单判断：如果当前是在关闭 SearchApp，则恢复全局
+                // 这里我们假设 closeApp 被调用意味着并不是在 SearchPhone 内部操作
+                // 或者我们可以检查 SearchPhoneUI 状态?
+
+                // 延迟恢复，确保 UI 切换完成
+                setTimeout(() => {
+                    const globalTheme = AppStorage.get('theme_config', {});
+                    ThemeLogic.apply(globalTheme);
+                }, 100);
+            };
+        })();
+    </script>
+
+    <!-- [Auto-Fix] Phone UI Interaction Patch -->
+    <script>
+        (function () {
+            console.log('[Fix] Initializing Phone UI Auto-Repair...');
+
+            // 1. Monkey-patch SearchPhoneUI.closeSubApp
+            const fixInterval = setInterval(() => {
+                if (typeof SearchPhoneUI !== 'undefined' && SearchPhoneUI.closeSubApp) {
+                    console.log('[Fix] SearchPhoneUI found, applying patch...');
+
+                    const originalClose = SearchPhoneUI.closeSubApp;
+                    SearchPhoneUI.closeSubApp = function () {
+                        console.log('[Fix] Closing app via patched function...');
+                        // Call original
+                        originalClose.apply(this, arguments);
+
+                        // FORCE RESET UI State
+                        setTimeout(() => {
+                            console.log('[Fix] Resetting UI state after app close');
+                            document.body.style.overflow = '';
+                            document.body.style.pointerEvents = 'auto';
+
+                            const desktop = document.getElementById('search-page-desktop');
+                            if (desktop) desktop.style.pointerEvents = 'auto';
+
+                            const select = document.getElementById('search-page-select');
+                            if (select) select.style.pointerEvents = 'auto';
+
+                            const appSearch = document.getElementById('app-search');
+                            if (appSearch) appSearch.style.pointerEvents = 'auto';
+                        }, 100);
+                    };
+
+                    clearInterval(fixInterval);
                 }
-                if (document.body.style.overflow === 'hidden') {
-                    // Only reset overflow if we are NOT in another modal
-                    const visibleOverlays = document.querySelectorAll('.modal-overlay:not(.hidden)');
-                    if (visibleOverlays.length === 0) {
-                        console.log('[Fix] Watchdog: Detected stuck overflow, resetting...');
-                        document.body.style.overflow = '';
+            }, 500);
+
+            // 2. Global Watchdog (Safety Net)
+            setInterval(() => {
+                const subAppModal = document.getElementById('modal-phone-subapp');
+                // If modal exists and is hidden (translated away)
+                if (subAppModal && subAppModal.classList.contains('translate-y-full')) {
+                    // Check if body is locked
+                    if (document.body.style.pointerEvents === 'none') {
+                        console.log('[Fix] Watchdog: Detected stuck pointer-events, resetting...');
+                        document.body.style.pointerEvents = 'auto';
+                    }
+                    if (document.body.style.overflow === 'hidden') {
+                        // Only reset overflow if we are NOT in another modal
+                        const visibleOverlays = document.querySelectorAll('.modal-overlay:not(.hidden)');
+                        if (visibleOverlays.length === 0) {
+                            console.log('[Fix] Watchdog: Detected stuck overflow, resetting...');
+                            document.body.style.overflow = '';
+                        }
                     }
                 }
-            }
-        }, 2000);
-    })();
-</script>
+            }, 2000);
+        })();
+    </script>
 
 </body>
 
