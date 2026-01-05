@@ -10124,12 +10124,15 @@ ${ivFormat}
                 // 辅助函数：从可能是对象或字符串的值中提取文本
                 const getString = (val) => {
                     if (!val) return null;
-                    if (typeof val === 'string') return val;
-                    if (typeof val === 'object') {
+                    let str = '';
+                    if (typeof val === 'string') str = val;
+                    else if (typeof val === 'object') {
                         // 如果是对象，按照优先级提取内部字段
-                        return val.想法 || val.心情 || val.content || val.thought || val.mind || JSON.stringify(val);
+                        str = val.想法 || val.心情 || val.content || val.thought || val.mind || JSON.stringify(val);
+                    } else {
+                        str = String(val);
                     }
-                    return String(val);
+                    return str.replace(/###/g, '').trim();
                 };
 
                 // 处理嵌套结构 (content/inner_voice)
@@ -10187,7 +10190,7 @@ ${ivFormat}
                             // 增强正则：支持换行，支持忽略可选引号
                             const reg = new RegExp(`(?:\\\\")?${k}(?:\\\\")?\\s*[:：]\\s*(?:\\\\")?((?:[^"\\\\}]|\\\\.)*?)(?:\\\\")?(?:,|}|$)`, 'i');
                             const m = raw.match(reg);
-                            if (m && m[1]) return m[1].replace(/\\"/g, '"').trim();
+                            if (m && m[1]) return m[1].replace(/\\"/g, '"').replace(/###/g, '').trim();
                         }
                         return null;
                     };
@@ -10388,6 +10391,7 @@ ${ivFormat}
             },
 
             addVoice: (content, targetCid = null) => {
+                console.log('[InnerVoiceUI] addVoice called with:', content);
                 const chars = AppStorage.get('wechat_chars', {});
                 // 优先使用传入的 ID (用于后台处理)，否则读取 DOM (用于前台交互)
                 const cid = targetCid || document.getElementById('subpage-chat-detail')?.dataset.charId;
@@ -15977,6 +15981,11 @@ IMPORTANT:
                 const c = chars[id];
                 if (!c) return;
 
+                // 【修复】过滤掉纯时间戳消息 (Hide leaked timestamps from view)
+                if (typeof m.content === 'string' && /^\[\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}(:\d{2})?\]$/.test(m.content.trim())) {
+                    return;
+                }
+
                 const userProfile = AppStorage.get('wechat_user_profile', {});
                 const isSelf = m.role === 'user';
                 const avatar = isSelf ? (c.userAvatar || userProfile.avatar || WeChatUI.getRandomAvatar()) : (c.avatar || WeChatUI.getRandomAvatar());
@@ -16003,8 +16012,8 @@ IMPORTANT:
                     const iconClass = isVideo ? 'fa-video' : 'fa-phone-volume';
                     const html = `
                         <div class="msg-row ${isSelf ? 'self' : 'other'} animate-in fade-in slide-in-from-bottom-2 duration-300" data-msg-id="${m.id}" oncontextmenu="WeChatUI.showContextMenu(event, '${m.id}')" ${hiddenStyle}>
-                            <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"><i class="fa-solid fa-check"></i></div>
-                            <div class="msg-avatar ${shapeClass}"><img src="${avatar}"></div>
+                            <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"></div>
+                            <div class="msg-avatar ${shapeClass}"><img src="${avatar}" loading="lazy"></div>
                             <div class="msg-content">
                                 <div class="chat-bubble call-log-bubble" style="${targetCss}; display: flex; align-items: center; gap: 10px; padding: 10px 14px;">
                                     <i class="fa-solid ${iconClass} text-lg"></i>
@@ -16030,7 +16039,7 @@ IMPORTANT:
                     const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     const allEmojis = [...globalEmojis, ...(c.emojis || [])];
                     const isEmoji = allEmojis.some(e => e.url === m.content || m.content.includes(`[表情包: ${e.name}]`));
-                    contentHtml = `<div class="msg-image ${isEmoji ? 'emoji' : ''}" style="${isEmoji ? 'width: 120px; height: 120px;' : 'width: 100%; max-width: 300px;'}"><img src="${m.content}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;" onclick="window.open(this.src, '_blank')"></div>`;
+                    contentHtml = `<div class="msg-image ${isEmoji ? 'emoji' : ''}" style="${isEmoji ? 'width: 120px; height: 120px;' : 'width: 100%; max-width: 300px;'}"><img src="${m.content}" loading="lazy" style="width:100%; height:100%; object-fit:contain; border-radius:8px;" onclick="window.open(this.src, '_blank')"></div>`;
                     useBubble = false;
                 } else if (m.type === 'transfer' || m.type === 'redpacket') {
                     bubbleClass += (m.type === 'transfer') ? ' bubble-transfer' : ' bubble-redpacket';
@@ -16049,9 +16058,9 @@ IMPORTANT:
 
                 const html = `
                     <div class="msg-row ${isSelf ? 'self' : 'other'} animate-in fade-in slide-in-from-bottom-2 duration-300" data-msg-id="${m.id}" ${hiddenStyle} oncontextmenu="WeChatUI.showContextMenu(event, '${m.id}')">
-                        <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"><i class="fa-solid fa-check"></i></div>
+                        <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"></div>
                         <div class="msg-avatar ${shapeClass}" ondblclick="WeChatUI.handlePat('${id}', ${originalIdx}, '${m.role}', this)" ontouchstart="if(!this.lastClick){this.lastClick=Date.now();return;} if(Date.now()-this.lastClick<300){WeChatUI.handlePat('${id}', ${originalIdx}, '${m.role}', this); this.lastClick=0;} else {this.lastClick=Date.now();}">
-                            <img src="${avatar}">
+                            <img src="${avatar}" loading="lazy">
                         </div>
                         <div class="msg-content">
                             ${useBubble ? `<div class="${bubbleClass}" style="${targetCss}; font-size: ${c.bubbleFontSize || 15}px;">${contentHtml}</div>` : contentHtml}
@@ -16103,7 +16112,8 @@ IMPORTANT:
                         }
                     }
 
-                    if (!WeChatUI.currentLoadedMsgs[id]) WeChatUI.currentLoadedMsgs[id] = Math.min(c.displayLimit || 50, msgs.length);
+
+                    if (!WeChatUI.currentLoadedMsgs[id]) WeChatUI.currentLoadedMsgs[id] = Math.min(c.displayLimit || 20, msgs.length);
                     const currentMsgs = msgs.slice(-WeChatUI.currentLoadedMsgs[id]);
                     const startIdx = Math.max(0, msgs.length - WeChatUI.currentLoadedMsgs[id]);
                     const container = document.getElementById('chat-messages-container');
@@ -16114,6 +16124,7 @@ IMPORTANT:
                         container.insertAdjacentHTML('beforeend', `<div class="msg-load-more" onclick="WeChatUI.loadMoreMessages('${id}', ${npcId ? `'${npcId}'` : 'undefined'})"><div class="load-more-btn">加载更多</div></div>`);
                     }
 
+                    // 优化：滚动时预加载图片，减少闪烁
                     let lastTime = 0;
                     currentMsgs.forEach((m, idx) => {
                         if (m.hidden === true) return;
@@ -19436,7 +19447,7 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                 }
                 let cleanReply = reply.trim();
                 // 修复：移除 LLM 可能注入的时间戳 (e.g. [2026/01/06 01:02])
-                cleanReply = cleanReply.replace(/\[\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}\]/g, '').trim();
+                cleanReply = cleanReply.replace(/\[\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}(:\d{2})?\]\s*/g, '').trim();
 
                 // 1. 指令解析器 (Command Parser) - 朋友圈指令
                 // 匹配 [CMD:操作:ID:参数]
@@ -19549,13 +19560,15 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                         const jsonMatch = voiceJsonStr.match(/\{[\s\S]*\}/);
                         if (jsonMatch) {
                             const voiceJson = JSON.parse(jsonMatch[0]);
+                            console.log('[Inner Voice Debug] Raw JSON:', voiceJson);
                             // 兼容旧格式和新格式
                             const voiceText = {
-                                着装: (voiceJson.着装 || voiceJson.outfit || '-').replace(/###/g, ''),
-                                环境: (voiceJson.环境 || voiceJson.scene || '-').replace(/###/g, ''),
-                                心声: (voiceJson.心声 || voiceJson.thoughts || '-').replace(/###/g, ''),
-                                行为: (voiceJson.行为 || voiceJson.action || '-').replace(/###/g, '')
+                                着装: String(voiceJson.着装 || voiceJson.outfit || '-').replace(/###/g, ''),
+                                环境: String(voiceJson.环境 || voiceJson.scene || '-').replace(/###/g, ''),
+                                心声: String(voiceJson.心声 || voiceJson.thoughts || '-').replace(/###/g, ''),
+                                行为: String(voiceJson.行为 || voiceJson.action || '-').replace(/###/g, '')
                             };
+                            console.log('[Inner Voice Debug] Cleaned Text:', voiceText);
                             capturedInnerVoice = voiceText; // 暂存心声对象
                             InnerVoiceUI.addVoice(voiceText); // 存入心声系统
 
