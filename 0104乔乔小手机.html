@@ -7838,11 +7838,11 @@
                             }
 
                             // 导入系统设置
-                            if (importedData.wechat_api_configs || importedData.api_configs) {
-                                AppStorage.set('wechat_api_configs', importedData.wechat_api_configs || importedData.api_configs);
+                            if (importedData.wechat_api_configs) {
+                                AppStorage.set('wechat_api_configs', importedData.wechat_api_configs);
                             }
-                            if (importedData.wechat_current_api || importedData.current_api_id) {
-                                AppStorage.set('wechat_current_api', importedData.wechat_current_api || importedData.current_api_id);
+                            if (importedData.wechat_current_api) {
+                                AppStorage.set('wechat_current_api', importedData.wechat_current_api);
                             }
                             if (importedData.tts_config) AppStorage.set('tts_config', importedData.tts_config);
                             if (importedData.theme_config) AppStorage.set('theme_config', importedData.theme_config);
@@ -8202,10 +8202,6 @@
                 }
             },
 
-            // 【⚠️高危核心区域】修改前请务必仔细阅读！
-            // 此函数负责构建所有 API 请求的上下文（Persona, WorldBook, Memory, Functions）。
-            // 【禁止随意修改 Prompt 拼接顺序】：顺序已被用户锁定为 [Functions -> Persona -> World -> Other]。
-            // 【禁止随意修改 Emoji/Moments 提示词】：指令格式需严格匹配 handleAIReply 中的正则。
             generateLLM: async (messages, cid, callType = 'chat') => {
                 console.log(`[AI_DEBUG] generateLLM called. Type: ${callType}, CID: ${cid}`);
 
@@ -16007,6 +16003,7 @@ IMPORTANT:
                     const iconClass = isVideo ? 'fa-video' : 'fa-phone-volume';
                     const html = `
                         <div class="msg-row ${isSelf ? 'self' : 'other'} animate-in fade-in slide-in-from-bottom-2 duration-300" data-msg-id="${m.id}" oncontextmenu="WeChatUI.showContextMenu(event, '${m.id}')" ${hiddenStyle}>
+                            <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"><i class="fa-solid fa-check"></i></div>
                             <div class="msg-avatar ${shapeClass}"><img src="${avatar}"></div>
                             <div class="msg-content">
                                 <div class="chat-bubble call-log-bubble" style="${targetCss}; display: flex; align-items: center; gap: 10px; padding: 10px 14px;">
@@ -16052,6 +16049,7 @@ IMPORTANT:
 
                 const html = `
                     <div class="msg-row ${isSelf ? 'self' : 'other'} animate-in fade-in slide-in-from-bottom-2 duration-300" data-msg-id="${m.id}" ${hiddenStyle} oncontextmenu="WeChatUI.showContextMenu(event, '${m.id}')">
+                        <div class="msg-checkbox" onclick="WeChatUI.toggleSelect(${originalIdx}, this)"><i class="fa-solid fa-check"></i></div>
                         <div class="msg-avatar ${shapeClass}" ondblclick="WeChatUI.handlePat('${id}', ${originalIdx}, '${m.role}', this)" ontouchstart="if(!this.lastClick){this.lastClick=Date.now();return;} if(Date.now()-this.lastClick<300){WeChatUI.handlePat('${id}', ${originalIdx}, '${m.role}', this); this.lastClick=0;} else {this.lastClick=Date.now();}">
                             <img src="${avatar}">
                         </div>
@@ -19436,7 +19434,9 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                     WeChatUI.pushMessage('error', 'AI 返回了空内容', 'system');
                     return;
                 }
-                let cleanReply = reply;
+                let cleanReply = reply.trim();
+                // 修复：移除 LLM 可能注入的时间戳 (e.g. [2026/01/06 01:02])
+                cleanReply = cleanReply.replace(/\[\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}\]/g, '').trim();
 
                 // 1. 指令解析器 (Command Parser) - 朋友圈指令
                 // 匹配 [CMD:操作:ID:参数]
@@ -19551,10 +19551,10 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                             const voiceJson = JSON.parse(jsonMatch[0]);
                             // 兼容旧格式和新格式
                             const voiceText = {
-                                着装: voiceJson.着装 || voiceJson.outfit || '-',
-                                环境: voiceJson.环境 || voiceJson.scene || '-',
-                                心声: voiceJson.心声 || voiceJson.thoughts || '-',
-                                行为: voiceJson.行为 || voiceJson.action || '-'
+                                着装: (voiceJson.着装 || voiceJson.outfit || '-').replace(/###/g, ''),
+                                环境: (voiceJson.环境 || voiceJson.scene || '-').replace(/###/g, ''),
+                                心声: (voiceJson.心声 || voiceJson.thoughts || '-').replace(/###/g, ''),
+                                行为: (voiceJson.行为 || voiceJson.action || '-').replace(/###/g, '')
                             };
                             capturedInnerVoice = voiceText; // 暂存心声对象
                             InnerVoiceUI.addVoice(voiceText); // 存入心声系统
