@@ -16038,8 +16038,36 @@ IMPORTANT:
                 } else if (m.type === 'image') {
                     const globalEmojis = AppStorage.get('wechat_global_emojis', []);
                     const allEmojis = [...globalEmojis, ...(c.emojis || [])];
-                    const isEmoji = allEmojis.some(e => e.url === m.content || m.content.includes(`[表情包: ${e.name}]`));
-                    contentHtml = `<div class="msg-image ${isEmoji ? 'emoji' : ''}" style="${isEmoji ? 'width: 120px; height: 120px;' : 'width: 100%; max-width: 300px;'}"><img src="${m.content}" loading="lazy" style="width:100%; height:100%; object-fit:contain; border-radius:8px;" onclick="window.open(this.src, '_blank')"></div>`;
+
+                    let imgUrl = m.content;
+                    let isEmoji = false;
+
+                    // 1. 尝试解析 [表情包: 名称] 格式
+                    const emojiTagMatch = String(m.content).match(/^\[表情包:\s*(.+)\]$/);
+                    if (emojiTagMatch) {
+                        const emojiName = emojiTagMatch[1];
+                        const targetEmoji = allEmojis.find(e => e.name === emojiName);
+                        if (targetEmoji) {
+                            imgUrl = targetEmoji.url;
+                            isEmoji = true;
+                        } else {
+                            // 如果找不到对应名称的表情包，也尝试当作普通URL显示
+                        }
+                    } else {
+                        // 2. 如果是普通 URL，检查是否在表情包库中
+                        const targetEmoji = allEmojis.find(e => e.url === m.content);
+                        if (targetEmoji) {
+                            isEmoji = true;
+                        }
+                    }
+
+                    if (isEmoji) {
+                        // 表情包：固定尺寸 120x120
+                        contentHtml = `<div class="msg-image emoji" style="width: 120px; height: 120px;"><img src="${imgUrl}" loading="lazy" style="width:100%; height:100%; object-fit:contain; border-radius:8px;" onclick="window.open(this.src, '_blank')"></div>`;
+                    } else {
+                        // 普通图片：宽度自适应(最大300)，高度自适应
+                        contentHtml = `<div class="msg-image" style="max-width: 300px;"><img src="${imgUrl}" loading="lazy" style="width:100%; height:auto; border-radius:8px; display:block;" onclick="window.open(this.src, '_blank')"></div>`;
+                    }
                     useBubble = false;
                 } else if (m.type === 'transfer' || m.type === 'redpacket') {
                     bubbleClass += (m.type === 'transfer') ? ' bubble-transfer' : ' bubble-redpacket';
@@ -20050,8 +20078,8 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                                         // 是表情包，直接发送
                                         WeChatUI.pushMessage('image', url, 'ai', 'image');
                                     } else {
-                                        // 普通图片URL，发送为文本
-                                        WeChatUI.pushMessage('text', url, 'ai');
+                                        // 普通图片URL，发送为图片
+                                        WeChatUI.pushMessage('image', url, 'ai', 'image');
                                     }
                                 }
                             }
@@ -20334,10 +20362,12 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                             if (target) {
                                 msg.content = `[表情包: ${target.name}]`;
                             } else {
-                                msg.content = `[图片: ${content}]`;
+                                msg.content = content;
+                                msg.type = 'image';
                             }
                         } else {
-                            msg.content = `[图片: ${content}]`;
+                            msg.content = content;
+                            msg.type = 'image';
                         }
                     }
                     else if (type === 'redpacket') { msg.note = content || '恭喜发财'; msg.content = '红包'; msg.amount = '88.88'; }
@@ -28419,20 +28449,7 @@ ${char.prompt || char.persona || '这是一个普通角色'}
                     <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=char" alt="角色" class="avatar"
                         id="music-player-char-avatar">
 
-                    <!-- 爱心泡泡 -->
-                    <div class="heart-bubble">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                                fill="url(#heartGradient)" />
-                            <defs>
-                                <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#ff6b9d;stop-opacity:1" />
-                                    <stop offset="100%" style="stop-color:#ffc3d4;stop-opacity:1" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                    </div>
+                    <!-- 爱心泡泡已移除 -->
 
                     <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" alt="用户" class="avatar"
                         id="music-player-user-avatar">
