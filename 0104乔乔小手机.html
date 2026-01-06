@@ -15974,11 +15974,18 @@ IMPORTANT:
                 sentences = sentences.map(part => part.replace(/%%%PROTECTED_Block_(\d+)%%%/g, (match, index) => protectedBlocks[parseInt(index)] || match));
                 return sentences;
             },
-            // 【核心修复】渲染单条消息到容器
-            renderMessage: (container, m, id, originalIdx = -1) => {
+            // 【核心修复】渲染单条消息到容器 - 支持缓存优化
+            renderMessage: (container, m, id, originalIdx = -1, cache = null) => {
                 if (!container || !m) return;
-                const chars = AppStorage.get('wechat_chars', {});
-                const c = chars[id];
+
+                // 优先使用缓存的角色对象，避免重复解析大对象
+                let c;
+                if (cache && cache.charObj) {
+                    c = cache.charObj;
+                } else {
+                    const chars = AppStorage.get('wechat_chars', {});
+                    c = chars[id];
+                }
                 if (!c) return;
 
                 // 【修复】过滤掉纯时间戳消息 (Hide leaked timestamps from view)
@@ -15986,7 +15993,7 @@ IMPORTANT:
                     return;
                 }
 
-                const userProfile = AppStorage.get('wechat_user_profile', {});
+                const userProfile = (cache && cache.userProfile) ? cache.userProfile : AppStorage.get('wechat_user_profile', {});
                 const isSelf = m.role === 'user';
                 const avatar = isSelf ? (c.userAvatar || userProfile.avatar || WeChatUI.getRandomAvatar()) : (c.avatar || WeChatUI.getRandomAvatar());
                 const shapeClass = c.avatarShape === 'circle' ? 'circle' : 'square';
@@ -16036,7 +16043,7 @@ IMPORTANT:
                     let bubbleWidth = 80 + (seconds * 3);
                     contentHtml = `<div class="voice-container"><div class="chat-bubble ${m.playing ? 'voice-playing' : ''}" style="${targetCss}; width: ${bubbleWidth}px; min-height: 40px; border-radius: ${isSelf ? '12px 2px 12px 12px' : '2px 12px 12px 12px'}; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 0 12px;" onclick="WeChatUI.toggleVoiceText(${originalIdx}, '${id}', '${m.role}')"><div class="voice-icon" style="font-size: 16px;"><i class="fa-solid fa-wifi rotate-90"></i></div><span class="voice-duration" style="font-weight: bold; font-size: 14px;">${seconds}"</span></div><div class="voice-text ${m.expanded ? 'expanded' : ''}">${m.text}</div></div>`;
                 } else if (m.type === 'image') {
-                    const globalEmojis = AppStorage.get('wechat_global_emojis', []);
+                    const globalEmojis = (cache && cache.globalEmojis) ? cache.globalEmojis : AppStorage.get('wechat_global_emojis', []);
                     const allEmojis = [...globalEmojis, ...(c.emojis || [])];
 
                     let imgUrl = m.content;
@@ -16078,9 +16085,14 @@ IMPORTANT:
                     contentHtml = `<div class="pay-card ${m.status ? 'received' : ''}" onclick="WeChatUI.handlePaymentClick(${originalIdx}, '${m.type}', '${m.role}')"><div class="pay-top"><div class="pay-icon"><i class="fa-solid ${icon}"></i></div><div class="pay-info"><div class="pay-title">${(m.type === 'transfer') ? '¥' + amount : note}</div><div class="pay-desc">${(m.type === 'transfer') ? note : '领取红包'}</div></div></div><div class="pay-bottom">${statusText}</div></div>`;
                 } else {
                     let processed = String(m.content).replace(/\\n/g, '\n').replace(/\n/g, '<br>');
-                    if (/\[INNER_VOICE\]/i.test(processed)) {
-                        processed = processed.replace(/\[INNER_VOICE\]([\s\S]*?)\[\/INNER_VOICE\]/gi, (match, vc) => { useBubble = false; return `<div class="inner-voice-trigger-card" onclick="InnerVoiceUI.openModal()"><div style="font-size:10px; opacity:0.6; margin-bottom:6px;">Mindscape</div><div style="font-size:14px; font-family:'Noto Serif SC', serif;">${vc.trim()}</div></div>`; });
-                    }
+
+                    // 1. 过滤掉 <reasoning_content> 标签及其内容
+                    processed = processed.replace(/<reasoning_content>[\s\S]*?<\/reasoning_content>/gi, '');
+
+                    // 2. 过滤掉 [INNER_VOICE] 标签及其内容 (User requested deletion)
+                    processed = processed.replace(/\[INNER_VOICE\][\s\S]*?\[\/INNER_VOICE\]/gi, '');
+
+                    // 如果过滤后内容为空，显示特定占位符或直接保持空（视需求而定，这里保持空即可，空内容气泡也没关系）
                     contentHtml = processed;
                 }
 
@@ -16154,6 +16166,14 @@ IMPORTANT:
 
                     // 优化：滚动时预加载图片，减少闪烁
                     let lastTime = 0;
+
+                    // 【性能优化】预加载渲染所需的全局数据，避免在循环中重复读取 localStorage
+                    const renderCache = {
+                        charObj: c,
+                        userProfile: AppStorage.get('wechat_user_profile', {}),
+                        globalEmojis: AppStorage.get('wechat_global_emojis', [])
+                    };
+
                     currentMsgs.forEach((m, idx) => {
                         if (m.hidden === true) return;
                         const msgTime = m.timestamp || Date.now();
@@ -16161,7 +16181,7 @@ IMPORTANT:
                             container.insertAdjacentHTML('beforeend', `<div class="msg-system"><span>${Utils.formatChatTime(msgTime)}</span></div>`);
                             lastTime = msgTime;
                         }
-                        WeChatUI.renderMessage(container, m, id, startIdx + idx);
+                        WeChatUI.renderMessage(container, m, id, startIdx + idx, renderCache);
                     });
 
                     container.scrollTop = container.scrollHeight;
@@ -17120,14 +17140,13 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                     if (history.length > 0 && history[history.length - 1].role === 'user') {
                         const innerVoiceReminder = `
 
-                [⚠️ 必须严格遵守的强制格式 - 禁止使用英文键名]
-                你必须在回复的最后输出以下包含 ** 中文键名 ** 的 JSON 块。禁止使用 thought / emotion / plan 等英文，必须严格使用：
+                [系统强制指令：心声数据]
+                请在回复末尾追加以下 JSON 数据块（用于生成前端卡片），键名必须使用中文：
 
                 [INNER_VOICE]
-                { "着装": "描述你当前的衣服搭配", "环境": "描述当前时间地点和周围细节", "心声": "不要演戏，说出你最真实的内心独白", "行为": "描述你当下的具体动作" }
+                { "着装": "...", "环境": "...", "心声": "...", "行为": "..." }
                 [/INNER_VOICE]
-                    
-                    如果你使用了 thought / emotion / plan 等英文键名，系统将无法解析，请务必使用中文！`;
+                `;
 
                         appendToHistory(innerVoiceReminder);
                     }
@@ -17242,7 +17261,8 @@ Never summarize or fade to black.Explicit content is AUTHORIZED and EXPECTED.
                                     const char = chars[cid];
                                     if (char) {
                                         const moment = {
-                                            id: `moment_${Date.now()} _cmd`,
+                                            id: `moment_${Date.now()
+                                                } _cmd`,
                                             authorId: cid,
                                             authorName: char.name,
                                             authorAvatar: char.avatar,
