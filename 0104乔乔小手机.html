@@ -3979,6 +3979,15 @@
                     <input type="text" id="primary-api-name" placeholder="配置名称 (如: GPT-4)" class="setting-input">
                     <input type="text" id="primary-api-url" placeholder="接口地址 (https://api.openai.com/v1)"
                         class="setting-input">
+                    <div class="mb-3">
+                        <label class="text-xs text-gray-500 mb-1 block">接口协议类型</label>
+                        <select id="primary-api-type"
+                            class="setting-input bg-gray-50 border border-gray-200 text-gray-700"
+                            onchange="window.SettingsLogic.handleApiTypeChange()">
+                            <option value="openai">OpenAI (默认 / 兼容)</option>
+                            <option value="gemini">Google Gemini (原生)</option>
+                        </select>
+                    </div>
                     <input type="password" id="primary-api-key" placeholder="API Key (sk-...)" class="setting-input">
                     <div class="flex gap-2">
                         <input type="text" id="primary-api-model" placeholder="模型ID (自动拉取或手填)"
@@ -8232,6 +8241,16 @@
                     throw new Error("API配置无效");
                 }
 
+                // --- PROVIDER DETECTION ---
+                // Priority: 1. Manual Config 2. Auto-detect from URL 3. Default to OpenAI
+                let provider = config.type || 'openai';
+                if (!config.type) {
+                    if (config.url.includes('googleapis.com') || config.url.includes('gemini')) {
+                        provider = 'gemini';
+                    }
+                }
+                config.provider = provider; // Attach for sendRequest
+
                 const chars = AppStorage.get('wechat_chars', {});
                 const char = chars[cid];
 
@@ -8328,11 +8347,18 @@
                     }).join('\n');
                 }
 
-                // 【3. 准备API地址】
+                // 【3. 准备API地址】 (Refined to match Vue Logic)
                 let endpoint = config.url.replace(/\/$/, '');
-                if (!endpoint.endsWith('/chat/completions')) {
-                    if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
-                    else endpoint += '/v1/chat/completions';
+                if (!endpoint.includes('/chat/completions')) {
+                    if (endpoint.endsWith('/v1')) {
+                        endpoint = `${endpoint}/chat/completions`;
+                    } else if (endpoint.endsWith('/v1/')) {
+                        endpoint = `${endpoint}chat/completions`;
+                    } else {
+                        // Default: append /chat/completions directly (matches Vue aiService.js)
+                        // This fixes issues where providers don't use /v1 or user already included it in base
+                        endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
+                    }
                 }
                 // Store endpoint in config for sendRequest to use
                 config.endpoint = endpoint;
@@ -8522,7 +8548,8 @@ ${ivFormat}
                     }
                 }
 
-                console.log(`[AI_DEBUG] History source mode decision: ${isActiveMode ? 'ACTIVE' : 'CHAT'}. Limit applied: ${isActiveMode ? Math.min(historyLimit, 20) : historyLimit}`);
+                console.log(`[AI_DEBUG] History messages count: ${historyMsgs.length}, Total raw api messages: ${rawApiMessages.length}`);
+
 
                 // 【Multimodal Upgrade】Allow vision for images in context
                 // 【Optimization】Limit to LATEST 5 images only to avoid massive payloads and model/proxy limits
@@ -8662,27 +8689,91 @@ ${ivFormat}
                     }
                 }
 
-                // Payload Construction
-                const payload = {
-                    model: config.model,
-                    messages: apiMessages,
+                // --- PAYLOAD CONSTRUCTION ---
+                let payload = {};
 
-                    temperature: parseFloat(config.temp) || 0.9,
-                    max_tokens: parseInt(config.maxTokens || config.max_tokens) || 4096,
-                    // 【优化】添加双重格式安全设置，兼容不同 Proxy 标准
-                    safety_settings: [
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                    ],
-                    safetySettings: [
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-                    ]
-                };
+                // 1. OpenAI / Compatible Format
+                if (provider === 'openai') {
+                    payload = {
+                        model: config.model,
+                        messages: apiMessages,
+                        temperature: parseFloat(config.temp) || 0.7,
+                        max_tokens: parseInt(config.maxTokens || config.max_tokens) || 4096,
+                        // No safety_settings for OpenAI standard
+                    };
+                }
+                // 2. Google Gemini Native Format
+                else if (provider === 'gemini') {
+                    // Converter: OpenAI Messages -> Gemini Contents
+                    const geminiContents = apiMessages.map(msg => {
+                        let role = msg.role;
+                        if (role === 'system') return null; // Native Gemini usually uses separate system_instruction or merges it
+                        if (role === 'assistant') role = 'model';
+
+                        let parts = [];
+                        if (typeof msg.content === 'string') {
+                            parts = [{ text: msg.content }];
+                        } else if (Array.isArray(msg.content)) {
+                            parts = msg.content.map(p => {
+                                if (p.type === 'image_url') {
+                                    // Gemini expects base64 data directly, not a data URL prefix
+                                    const base64Data = p.image_url.url.split(',')[1];
+                                    const mimeType = p.image_url.url.split(';')[0].split(':')[1];
+                                    return { inline_data: { mime_type: mimeType, data: base64Data } };
+                                }
+                                return { text: p.text };
+                            });
+                        }
+                        return { role, parts };
+                    }).filter(c => c);
+
+                    // Extract System Prompt (already injected into first user message for OpenAI, but Gemini has a dedicated field)
+                    // For Gemini, we can try to extract it if it's the first part of the first user message
+                    let geminiSystemInstruction;
+                    if (apiMessages.length > 0 && apiMessages[0].role === 'user' && Array.isArray(apiMessages[0].content)) {
+                        const firstPart = apiMessages[0].content[0];
+                        if (firstPart && firstPart.type === 'text' && firstPart.text.startsWith('[系统规则与人设指令 - 请务必使用简体中文]')) {
+                            geminiSystemInstruction = { parts: [{ text: firstPart.text }] };
+                            // Remove system instruction from the first user message content
+                            apiMessages[0].content.shift();
+                            if (apiMessages[0].content.length === 0) {
+                                // If only system instruction was there, remove the message
+                                geminiContents.shift();
+                            }
+                        }
+                    } else if (apiMessages.length > 0 && apiMessages[0].role === 'user' && typeof apiMessages[0].content === 'string' && apiMessages[0].content.startsWith('[系统规则与人设指令 - 请务务必使用简体中文]')) {
+                        const systemEndIndex = apiMessages[0].content.indexOf('[规则与指令结束]\n\n');
+                        if (systemEndIndex !== -1) {
+                            geminiSystemInstruction = { parts: [{ text: apiMessages[0].content.substring(0, systemEndIndex + '[规则与指令结束]\n\n'.length) }] };
+                            apiMessages[0].content = apiMessages[0].content.substring(systemEndIndex + '[规则与指令结束]\n\n'.length);
+                            if (apiMessages[0].content.trim() === '') {
+                                geminiContents.shift(); // Remove the now empty user message
+                            } else {
+                                // Update the first user message content in geminiContents
+                                const firstGeminiUserMsg = geminiContents.find(c => c.role === 'user');
+                                if (firstGeminiUserMsg) {
+                                    firstGeminiUserMsg.parts[0].text = apiMessages[0].content;
+                                }
+                            }
+                        }
+                    }
+
+
+                    payload = {
+                        contents: geminiContents,
+                        system_instruction: geminiSystemInstruction,
+                        generationConfig: {
+                            temperature: parseFloat(config.temp) || 0.7,
+                            maxOutputTokens: parseInt(config.maxTokens) || 4096,
+                        },
+                        safetySettings: [
+                            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                        ]
+                    };
+                }
 
                 return await SettingsLogic.sendRequest(payload, config, callType);
             },
@@ -8694,16 +8785,43 @@ ${ivFormat}
                     SystemLog.write('AI', 'API请求入队', { model: config.model, queueLength: targetQueue.queue.length });
                 }
 
-                // 确定 Endpoint，如果 payload 还没传进来，使用 config 中计算好的
+                // Determine Endpoint based on provider
                 let endpoint = config.endpoint || config.url;
-                // re-calculate if missing (for Task mode where we skipped full flow)
-                if (!endpoint.endsWith('/chat/completions')) {
-                    if (endpoint.endsWith('/v1')) endpoint += '/chat/completions';
-                    else endpoint += '/v1/chat/completions';
+                let headers = { 'Content-Type': 'application/json' };
+
+                if (config.provider === 'gemini') {
+                    // Gemini typically uses /v1beta/models/{model}:generateContent
+                    if (!endpoint.includes(':generateContent')) {
+                        endpoint = endpoint.replace(/\/$/, ''); // Remove trailing slash
+                        if (!endpoint.includes('/models/')) {
+                            endpoint = `${endpoint}/v1beta/models/${config.model}:generateContent`;
+                        } else {
+                            endpoint = `${endpoint}:generateContent`;
+                        }
+                    }
+                    // Native Gemini uses ?key= API_KEY
+                    if (!endpoint.includes('key=')) {
+                        const separator = endpoint.includes('?') ? '&' : '?';
+                        endpoint = `${endpoint}${separator}key=${config.key}`;
+                    }
+                } else {
+                    // Default to OpenAI compatible
+                    headers['Authorization'] = 'Bearer ' + config.key;
+
+                    if (!endpoint.includes('/chat/completions')) {
+                        endpoint = endpoint.replace(/\/$/, ''); // Remove trailing slash
+                        if (endpoint.endsWith('/v1')) {
+                            endpoint = `${endpoint}/chat/completions`;
+                        } else if (endpoint.endsWith('/v1/')) {
+                            endpoint = `${endpoint}chat/completions`;
+                        } else {
+                            endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
+                        }
+                    }
                 }
 
                 return targetQueue.enqueue(async () => {
-                    if (window.SystemLog) SystemLog.write('AI', '发起网络请求', payload);
+                    if (window.SystemLog) SystemLog.write('AI', '发起网络请求', { endpoint, payload }); // Log endpoint too
 
                     const abortController = new AbortController();
                     window.currentAIAbortController = abortController;
@@ -8712,10 +8830,8 @@ ${ivFormat}
                     try {
                         const res = await fetch(endpoint, {
                             method: 'POST',
-                            headers: { 'Authorization': 'Bearer ' + config.key, 'Content-Type': 'application/json' },
+                            headers: headers,
                             body: JSON.stringify(payload),
-                            mode: 'cors',
-                            credentials: 'omit',
                             signal: abortController.signal
                         });
 
@@ -8724,6 +8840,8 @@ ${ivFormat}
                             try {
                                 const errorData = await res.json();
                                 if (errorData.error) errorMsg += ': ' + errorData.error.message;
+                                else if (errorData.message) errorMsg += ': ' + errorData.message; // Some APIs use 'message'
+                                else errorMsg += ': ' + JSON.stringify(errorData);
                             } catch (e) { errorMsg += ': ' + await res.text(); }
 
                             if (window.SystemLog) SystemLog.write('ERR', 'API 请求失败', errorMsg);
